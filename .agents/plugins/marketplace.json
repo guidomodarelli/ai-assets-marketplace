@@ -1,12 +1,12 @@
 {
-  "name": "beez-marketplace",
+  "name": "ai-assets-marketplace",
   "interface": {
-    "displayName": "Beez Marketplace"
+    "displayName": "AI Assets Marketplace"
   },
   "plugins": [
     {
-      "name": "beez-kit",
-      "source": "./plugins/beez-kit",
+      "name": "ai-assets-kit",
+      "source": "./plugins/ai-assets-kit",
       "policy": {
         "installation": "AVAILABLE",
         "authentication": "ON_INSTALL"

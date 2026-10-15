@@ -4,7 +4,7 @@ description: "Resuelve warnings de act() en tests React (fix act warnings): not 
 license: MIT
 metadata:
   version: "1.0.0"
-  author: "Beez"
+  author: "AI Assets"
   category: "testing"
   tags: "react, jest, testing-library, act, async, context-optimized-v1.20.1"
   command: "/react-act-test-fixes"

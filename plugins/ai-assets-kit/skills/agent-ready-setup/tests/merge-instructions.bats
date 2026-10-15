@@ -2,7 +2,7 @@
 
 setup() {
   repository_root="$(cd "$BATS_TEST_DIRNAME/../../../../.." && pwd)"
-  skill_dir="$repository_root/plugins/beez-kit/skills/agent-ready-setup"
+  skill_dir="$repository_root/plugins/ai-assets-kit/skills/agent-ready-setup"
   test_root="$(mktemp -d)"
   project_dir="$test_root/project"
   fake_bin="$test_root/bin"
@@ -134,15 +134,15 @@ Local edit inside the block.
 
 ## Ownership
 
-Team Beez owns this service.
+Team AI Assets owns this service.
 EOF
-  write_review_response $'# Project\n\nProject description.\n\n'"$managed_placeholder"$'\n\n## Ownership\n\nTeam Beez owns this service.'
+  write_review_response $'# Project\n\nProject description.\n\n'"$managed_placeholder"$'\n\n## Ownership\n\nTeam AI Assets owns this service.'
 
   run_merge node
 
   [ "$status" -eq 0 ]
   expected="$(printf '%s\n\n%s\n\n%s\n%s\n\n%s\n\n%s' '# Project' 'Project description.' \
-    "$(render_managed_block node)" '' '## Ownership' 'Team Beez owns this service.')"
+    "$(render_managed_block node)" '' '## Ownership' 'Team AI Assets owns this service.')"
   [ "$(cat AGENTS.md)" = "$(sed '/^$/N;/^\n$/D' <<< "$expected")" ]
   ! grep -Fq 'Local edit inside the block.' AGENTS.md
   ! grep -Fq 'retired.md' AGENTS.md
@@ -656,7 +656,7 @@ EOF
 
 ## Ownership
 
-Team Beez owns this service.
+Team AI Assets owns this service.
 EOF
 
   run_apply_managed_block node
@@ -664,7 +664,7 @@ EOF
   [ "$status" -eq 0 ]
   [ "$(provider_call_count)" -eq 0 ]
   ! grep -Fq 'retired.md' AGENTS.md
-  grep -Fxq 'Team Beez owns this service.' AGENTS.md
+  grep -Fxq 'Team AI Assets owns this service.' AGENTS.md
   [[ "$output" == *"redundancy review runs in the background"* ]]
   bash "$skill_dir/scripts/render-instruction-template.sh" --validate AGENTS.md \
     --rules-dir "$skill_dir/assets/stacks/node/rules" \
