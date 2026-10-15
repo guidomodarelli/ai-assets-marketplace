@@ -2,14 +2,14 @@
 
 
 El upgrade del marketplace usa la CLI del provider activo
-(`claude plugin marketplace update beez-marketplace` o
-`codex plugin marketplace upgrade beez-marketplace`) y actualiza la copia global
+(`claude plugin marketplace update ai-assets-marketplace` o
+`codex plugin marketplace upgrade ai-assets-marketplace`) y actualiza la copia global
 del marketplace; no vuelve a proyectar por sí mismo los templates sobre un proyecto
 ya preparado. `bootstrap.sh` ejecuta ese upgrade automáticamente para el provider
 activo antes de proyectar assets o adquirir lock local.
 `codex plugin marketplace upgrade` solo refresca marketplaces Git: si
-`~/.codex/config.toml` declara `source_type = "local"` para `beez-marketplace`
-(lo que registra `codex plugin marketplace add "$PWD/beez-marketplace"`),
+`~/.codex/config.toml` declara `source_type = "local"` para `ai-assets-marketplace`
+(lo que registra `codex plugin marketplace add "$PWD/ai-assets-marketplace"`),
 `bootstrap.sh` y el hook omiten el upgrade y resuelven assets desde ese `source`.
 El hook canónico `.agents/hooks/sync-marketplace.sh` ejecuta el upgrade salvo que
 haya uno exitoso de menos de 60 minutos para el mismo provider (marca en
@@ -26,14 +26,14 @@ incluye `CLAUDE.md` bajo `.claude/` y conserva conflictos, symlinks y archivos n
 regulares.
 El upgrade solo refresca el snapshot del marketplace del provider (Claude:
 `installLocation` de `~/.claude/plugins/known_marketplaces.json`, por defecto
-`~/.claude/plugins/marketplaces/beez-marketplace`; Codex: `source` local de
-`~/.codex/config.toml` o `~/.codex/.tmp/marketplaces/beez-marketplace`); el cache
+`~/.claude/plugins/marketplaces/ai-assets-marketplace`; Codex: `source` local de
+`~/.codex/config.toml` o `~/.codex/.tmp/marketplaces/ai-assets-marketplace`); el cache
 versionado del plugin avanza recién con `/plugin` update. Por eso el hook resuelve
 la fuente desde ese snapshot salvo que el cache tenga una versión semver mayor, y
 proyecta la última versión publicada sin depender de la versión instalada del plugin.
 `bootstrap.sh` aplica el mismo criterio y reporta la fuente elegida en `Resolved agent-ready-setup source: <path>`.
 Si la fuente resuelta no contiene `scripts/asset-sync-common.sh`, el hook ejecuta un
-refresh adicional de `beez-marketplace`, vuelve a resolver la fuente y carga helper
+refresh adicional de `ai-assets-marketplace`, vuelve a resolver la fuente y carga helper
 mediante `source` antes de proyectar cualquier asset. Si refresh no entrega helper,
 conserva hook local, omite proyección y muestra diagnóstico; no instala un
 `sync-marketplace.sh` que no pueda arrancar.
