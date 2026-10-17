@@ -843,7 +843,7 @@ EOF
     grep -Fq -- '- Read and follow `.agents/rules/coding-style.md`.' AGENTS.md
     grep -Fq -- '- Read and follow `.agents/rules/security.md`.' AGENTS.md
     grep -Fq -- '- Read and follow `.agents/rules/testing.md`.' AGENTS.md
-    for common_rule in language-consistency.md lint-gate.md; do
+    for common_rule in established-libraries.md language-consistency.md lint-gate.md user-actions-first.md verify-changes.md; do
       grep -Fq -- "- Read and follow \`.agents/rules/$common_rule\`." AGENTS.md
       cmp -s ".agents/rules/$common_rule" "$skill_dir/assets/common/rules/$common_rule"
       [ -L ".claude/rules/$common_rule" ]
@@ -2628,7 +2628,7 @@ EOF
 @test "common marketplace assets have no stack duplicates" {
   [ -f "$skill_dir/assets/common/settings.json" ]
   [ -f "$skill_dir/assets/common/hooks/sync-marketplace.sh" ]
-  for common_rule in language-consistency.md lint-gate.md; do
+  for common_rule in established-libraries.md language-consistency.md lint-gate.md user-actions-first.md verify-changes.md; do
     [ -f "$skill_dir/assets/common/rules/$common_rule" ]
   done
   [ -f "$skill_dir/scripts/asset-sync-common.sh" ]
@@ -2639,6 +2639,9 @@ EOF
     [ ! -e "$skill_dir/assets/stacks/$stack/hooks/sync-marketplace.sh" ]
     [ ! -e "$skill_dir/assets/stacks/$stack/rules/language-consistency.md" ]
     [ ! -e "$skill_dir/assets/stacks/$stack/rules/lint-gate.md" ]
+    [ ! -e "$skill_dir/assets/stacks/$stack/rules/established-libraries.md" ]
+    [ ! -e "$skill_dir/assets/stacks/$stack/rules/verify-changes.md" ]
+    [ ! -e "$skill_dir/assets/stacks/$stack/rules/user-actions-first.md" ]
   done
 }
 
