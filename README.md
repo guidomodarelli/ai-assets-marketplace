@@ -252,6 +252,9 @@ bun run setup:browser-tests
 bun run test
 ```
 
+`bun run test:review-fix-loop` corre solo la suite del helper de `review-fix-loop`, que usa
+providers falsos y no llama a Claude ni a Codex reales.
+
 `bun run test:browser` ejecuta pruebas de registro browser desde el venv local,
 sin descargar dependencias. La prueba de lanzamiento real es opt-in mediante
 `AGENT_READY_SETUP_BROWSER_SMOKE_ROOT` (directorio administrado de herramientas)
