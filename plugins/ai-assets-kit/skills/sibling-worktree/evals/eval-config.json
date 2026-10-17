@@ -1,0 +1,304 @@
+{
+  "schema_version": 2,
+  "skill": "sibling-worktree",
+  "description": "Evalúa la gestión de worktrees hermanos: dry-run previo, fetch dirigido con fast-forward seguro, reutilización de la misma rama, ubicación hermana inmediata, bloqueos de seguridad sin --force ni reset, remoción sin borrar la rama y derivación de flujos fuera de alcance.",
+  "test_cases": [
+    {
+      "id": "create-local-branch-same-name",
+      "description": "Crea un worktree hermano para una rama local existente con dry-run, fetch dirigido y fast-forward, sin rama derivada.",
+      "input": "Contexto: el repo principal está en /workspace/app (checkout en develop). Existe la rama local feature/operators con upstream origin/feature/operators y no está checkout en ningún worktree. Usando la skill sibling-worktree, describí el plan paso a paso con los comandos que usarías, sin ejecutar nada: creá un worktree hermano persistente para la rama local feature/operators usando la misma rama, sin crear una rama derivada.",
+      "assertions": [
+        {
+          "type": "contains",
+          "value": "dry-run",
+          "description": "Ejecuta primero un dry-run"
+        },
+        {
+          "type": "contains_any",
+          "values": ["fetch dirigido", "targeted fetch", "fetch origin", "fetch"],
+          "description": "Prevé un fetch de la fuente remota"
+        },
+        {
+          "type": "contains_any",
+          "values": ["fast-forward", "ff-only", "avance rápido"],
+          "description": "Prevé actualizar la rama local solo por fast-forward"
+        },
+        {
+          "type": "contains_any",
+          "values": ["/workspace/app-", "hermano inmediato", "hermana inmediata", "ruta hermana", "sibling path"],
+          "description": "Ubica el destino como ruta hermana del repo principal"
+        },
+        {
+          "type": "contains",
+          "value": "feature/operators",
+          "description": "Reutiliza la misma rama feature/operators"
+        }
+      ]
+    },
+    {
+      "id": "remote-branch-local-tracking",
+      "description": "Materializa una rama remota como rama local homónima con upstream, tras fetch dirigido solo a esa rama.",
+      "input": "Contexto: repo principal en /workspace/app. No existe rama local feature/es5-migration, pero sí origin/feature/es5-migration. Usando la skill sibling-worktree, describí el plan y los comandos sin ejecutar nada: creá otro worktree para origin/feature/es5-migration. La rama local debe llamarse feature/es5-migration y quedar trackeando el remote. Indicá qué reportarías al final.",
+      "assertions": [
+        {
+          "type": "contains",
+          "value": "origin/feature/es5-migration",
+          "description": "Usa origin/feature/es5-migration como fuente"
+        },
+        {
+          "type": "contains_any",
+          "values": ["fetch dirigido", "targeted fetch", "fetch origin feature/es5-migration", "únicamente", "solo esa rama", "solo la rama"],
+          "description": "Actualiza únicamente la rama remota fuente"
+        },
+        {
+          "type": "contains_any",
+          "values": ["upstream", "tracking", "trackea", "trackeando"],
+          "description": "Reporta el upstream de la rama local"
+        },
+        {
+          "type": "contains_any",
+          "values": ["OID", "SHA", "commit fuente", "HEAD"],
+          "description": "Reporta el OID fuente"
+        }
+      ]
+    },
+    {
+      "id": "primary-branch-conflict-confirmation",
+      "description": "Detecta que la rama está checkout en el principal, explica el conflicto y pide confirmación antes de mover el principal a develop.",
+      "input": "Contexto: el worktree principal /workspace/app tiene checkout la rama feature/payments y está limpio. Usando la skill sibling-worktree, describí qué harías y qué le dirías al usuario, sin ejecutar nada: quiero un checkout adicional de la rama actual, que ya está usada por el worktree principal. Mové el principal a develop solo si hace falta y pedime confirmación antes.",
+      "assertions": [
+        {
+          "type": "contains_any",
+          "values": ["dos veces", "dos worktrees", "twice", "two worktrees", "más de un worktree", "ya está checkout", "already checked out", "ocupada"],
+          "description": "Explica que una rama no puede estar checkout dos veces"
+        },
+        {
+          "type": "contains_any",
+          "values": ["confirmación", "confirmar", "confirmes", "confirmás", "confirm"],
+          "description": "Pide confirmación explícita antes de mover el principal"
+        },
+        {
+          "type": "contains",
+          "value": "develop",
+          "description": "Propone develop como rama de reemplazo del principal"
+        },
+        {
+          "type": "contains_any",
+          "values": ["confirm-primary-switch-to-develop", "después de confirmar", "tras confirmar", "solo si confirm", "una vez que confirm"],
+          "description": "Mueve el principal solo después de la confirmación"
+        }
+      ]
+    },
+    {
+      "id": "reject-existing-or-outside-path",
+      "description": "Rechaza una ruta existente o fuera del directorio hermano sin usar --force ni sobrescribir.",
+      "input": "Contexto: repo principal en /workspace/app. La ruta /opt/shared/checkout ya existe y contiene archivos. Usando la skill sibling-worktree, describí qué harías sin ejecutar nada: creá un worktree hermano de feature/reports en /opt/shared/checkout y sobrescribila si hace falta.",
+      "assertions": [
+        {
+          "type": "contains_any",
+          "values": ["rechaz", "bloque", "block", "no puedo", "no se puede", "no es válid", "inválid", "reject"],
+          "description": "Rechaza o bloquea la ruta pedida"
+        },
+        {
+          "type": "contains_any",
+          "values": ["hermano", "hermana", "sibling"],
+          "description": "Explica la regla de ubicación hermana"
+        },
+        {
+          "type": "contains_any",
+          "values": ["existe", "exist", "fuera del", "outside"],
+          "description": "Identifica que la ruta existe o está fuera del directorio hermano"
+        },
+        {
+          "type": "regex",
+          "pattern": "(no|nunca|never|not|sin)[^.]{0,60}(sobrescrib|overwrite|force)",
+          "description": "Declara que no sobrescribe ni usa --force"
+        }
+      ]
+    },
+    {
+      "id": "remove-sibling-keep-branch",
+      "description": "Remueve solo el worktree hermano limpio tras dry-run y conserva la rama local.",
+      "input": "Contexto: repo principal en /workspace/app y worktree hermano /workspace/app-operators con la rama feature/operators. Usando la skill sibling-worktree, describí el plan y los comandos sin ejecutar nada: remové el worktree hermano de feature/operators y conservá la rama local.",
+      "assertions": [
+        {
+          "type": "contains",
+          "value": "dry-run",
+          "description": "Ejecuta primero un dry-run de remove"
+        },
+        {
+          "type": "contains_any",
+          "values": ["limpio", "clean", "sin cambios"],
+          "description": "Verifica que el worktree esté limpio"
+        },
+        {
+          "type": "contains_any",
+          "values": ["principal", "primary", "main worktree"],
+          "description": "Distingue el worktree principal, que no se remueve"
+        },
+        {
+          "type": "regex",
+          "pattern": "(conserv|mantien|preserv|keep|permanece|no (se )?(borra|elimina)|sin borrar)[^.]{0,60}(rama|branch)|(rama|branch)[^.]{0,40}(permanece|se conserva|queda)",
+          "description": "Confirma que la rama local permanece"
+        }
+      ]
+    },
+    {
+      "id": "ephemeral-clone-out-of-scope",
+      "description": "No adopta el flujo de clone efímero con commit y push; lo deriva o lo informa fuera de alcance.",
+      "input": "Usando la skill sibling-worktree, describí qué harías sin ejecutar nada: usá un clone efímero para corregir el issue #42, hacé commit, push y limpiá todo.",
+      "assertions": [
+        {
+          "type": "contains_any",
+          "values": ["fix-in-ephemeral-clone", "fuera del alcance", "fuera de alcance", "out of scope", "no cubre", "no corresponde", "no es para"],
+          "description": "Informa que el pedido está fuera del alcance de sibling-worktree o lo deriva"
+        },
+        {
+          "type": "contains_any",
+          "values": ["clone efímero", "clon efímero", "ephemeral"],
+          "description": "Reconoce el pedido de clone efímero"
+        },
+        {
+          "type": "not_contains_any",
+          "values": ["git commit -m", "git push origin", "git clone --depth"],
+          "description": "No adopta comandos de commit, push ni clone"
+        }
+      ]
+    },
+    {
+      "id": "stale-remote-main-fetch-first",
+      "description": "Hace fetch dirigido de origin/main antes de crear el worktree, aplica fast-forward y verifica HEAD contra el OID fuente.",
+      "input": "Contexto: repo principal en /workspace/app (checkout en develop). La remote-tracking ref local origin/main está atrasada respecto de GitHub. Usando la skill sibling-worktree, describí el plan y los comandos sin ejecutar nada: creá un worktree para main usando la última versión publicada.",
+      "assertions": [
+        {
+          "type": "regex",
+          "pattern": "fetch[^.]{0,40}(origin[ /]main|main)",
+          "description": "Hace fetch dirigido de origin/main"
+        },
+        {
+          "type": "contains_any",
+          "values": ["fast-forward", "ff-only", "avance rápido"],
+          "description": "Aplica fast-forward seguro si corresponde"
+        },
+        {
+          "type": "contains_any",
+          "values": ["OID", "SHA"],
+          "description": "Verifica y reporta el OID fuente"
+        },
+        {
+          "type": "regex",
+          "pattern": "antes de (crear|ejecutar|git worktree add)|before (creat|git worktree add)",
+          "description": "Sincroniza antes de crear el worktree"
+        }
+      ]
+    },
+    {
+      "id": "block-no-upstream-and-diverged",
+      "description": "Bloquea rama sin upstream y rama divergida con código de seguridad, sin reset, force ni destino parcial.",
+      "input": "Contexto: repo principal en /workspace/app. La rama local feature/draft no tiene upstream. La rama local feature/legacy tiene upstream origin/feature/legacy pero divergió (commits locales y remotos distintos). Usando la skill sibling-worktree, describí qué pasaría y qué harías sin ejecutar nada: creá un worktree desde feature/draft y luego otro desde feature/legacy.",
+      "assertions": [
+        {
+          "type": "contains",
+          "value": "upstream",
+          "description": "Explica la falta de upstream"
+        },
+        {
+          "type": "contains",
+          "value": "diverg",
+          "description": "Explica la divergencia"
+        },
+        {
+          "type": "contains_any",
+          "values": ["bloque", "block", "detien", "rechaz", "no se crea", "no crea"],
+          "description": "Bloquea ambos casos"
+        },
+        {
+          "type": "regex",
+          "pattern": "(codigo|código|code|exit|salida)[^.]{0,25}3",
+          "description": "Menciona el código de salida 3 de bloqueo de seguridad"
+        },
+        {
+          "type": "regex",
+          "pattern": "(no|nunca|never|sin)[^.]{0,80}(reset|force)",
+          "description": "Declara que no usa reset ni force"
+        }
+      ]
+    },
+    {
+      "id": "dry-run-stale-remote-no-mutation",
+      "description": "El dry-run sobre una rama remota stale muestra fetch y fast-forward previstos sin modificar refs ni afirmar actualidad garantizada.",
+      "input": "Contexto: repo principal en /workspace/app; origin/feature/search está stale localmente. Usando la skill sibling-worktree, describí qué mostraría y qué no modificaría el comando sin ejecutar nada: ejecutá create con --dry-run sobre origin/feature/search.",
+      "assertions": [
+        {
+          "type": "contains",
+          "value": "dry-run",
+          "description": "Usa el modo dry-run"
+        },
+        {
+          "type": "contains_any",
+          "values": ["previsto", "prevista", "planned", "would", "mostraría", "muestra"],
+          "description": "Muestra fetch y fast-forward previstos"
+        },
+        {
+          "type": "contains_any",
+          "values": ["FETCH_HEAD", "no modifica", "sin modificar", "does not modify", "no toca", "no cambia"],
+          "description": "No modifica refs, FETCH_HEAD, filesystem ni worktrees"
+        },
+        {
+          "type": "regex",
+          "pattern": "(no|sin|not)[^.]{0,40}(garantiz|guarantee|afirma|asegura|confirma)",
+          "description": "No afirma actualidad remota garantizada"
+        }
+      ]
+    },
+    {
+      "id": "name-from-sibling-uses-primary-path",
+      "description": "Al invocar create con --name desde un worktree hermano, calcula el destino desde primary_path y no dentro del worktree actual.",
+      "input": "Contexto: el repo principal es /workspace/app y la sesión está en el worktree hermano /workspace/app-hotfix. Usando la skill sibling-worktree, describí el plan y la ruta destino exacta sin ejecutar nada: invocá create para la rama feature/reports usando --name reports.",
+      "assertions": [
+        {
+          "type": "contains",
+          "value": "/workspace/app-reports",
+          "description": "El destino es hermano inmediato del repo principal"
+        },
+        {
+          "type": "contains_any",
+          "values": ["primary_path", "worktree principal", "repo principal", "git worktree list"],
+          "description": "Calcula el destino desde el worktree principal"
+        },
+        {
+          "type": "not_contains_any",
+          "values": ["app-hotfix-reports", "app-hotfix/reports", "app/.claude/worktrees/reports"],
+          "description": "No crea el destino dentro ni al lado del worktree actual ni en .claude/worktrees"
+        }
+      ]
+    },
+    {
+      "id": "block-nested-worktrees-path",
+      "description": "Bloquea --path dentro de .worktrees o .claude/worktrees antes de fetch y de git worktree add, sin corregir la ruta en silencio.",
+      "input": "Contexto: repo principal en /workspace/app. Usando la skill sibling-worktree, describí qué harías sin ejecutar nada: creá un worktree de feature/audit con --path /workspace/app/.worktrees/audit y otro de feature/metrics con --path /workspace/app/.claude/worktrees/metrics.",
+      "assertions": [
+        {
+          "type": "contains_any",
+          "values": ["bloque", "block", "rechaz", "inválid", "no es válid"],
+          "description": "Bloquea ambas rutas"
+        },
+        {
+          "type": "contains_any",
+          "values": ["hermano inmediato", "hermana inmediata", "immediate sibling", "hermano", "sibling"],
+          "description": "Explica que el destino debe ser hermano inmediato"
+        },
+        {
+          "type": "regex",
+          "pattern": "antes (de|del) [^.]{0,30}(fetch|git worktree add)|before [^.]{0,30}(fetch|git worktree add)",
+          "description": "Bloquea antes de fetch y de git worktree add"
+        },
+        {
+          "type": "regex",
+          "pattern": "(no|nunca|never|sin)[^.]{0,60}(corrig|reinterpret|silenc|sobrescrib|overwrite|mov)",
+          "description": "No corrige la ruta en silencio ni sobrescribe"
+        }
+      ]
+    }
+  ]
+}

@@ -1,0 +1,169 @@
+{
+  "schema_version": 2,
+  "skill": "pr-inline-comment-template",
+  "description": "Evalúa comentarios de review de PR: badge de severidad P1/P2/P3 con URL directa, título en negrita, bloque Solución, details solo cuando aporta, idioma español aunque el pedido llegue en inglés, publicación inline por defecto (con commit_id, path, line y side=RIGHT), comentario general cuando no hay línea del diff y borrador solo si se pide.",
+  "test_cases": [
+    {
+      "id": "draft-correctness-issue-p2",
+      "description": "Borrador pedido explícitamente: usa el template con badge P2 inline, título en negrita y bloque Solución, sin publicar.",
+      "input": "Usando pr-inline-comment-template, solo quiero el texto en borrador, no lo publiques: en `src/orders/total.ts` línea 18 el cálculo usa `items.length` en vez de sumar `item.quantity`, así que el total de unidades queda mal cuando un ítem tiene cantidad mayor a 1. No ejecutes gh: devolvé solo el comentario en Markdown.",
+      "assertions": [
+        {
+          "type": "contains",
+          "value": "img.shields.io/badge/P2-yellow?style=flat",
+          "description": "Usa el badge P2 con la URL directa"
+        },
+        {
+          "type": "regex",
+          "pattern": "^\\*\\*<sub><sub>!\\[P[123] Badge\\]",
+          "description": "El badge y el título van juntos en negrita al inicio de la línea"
+        },
+        {
+          "type": "regex",
+          "pattern": "Solución\\*\\*",
+          "description": "Incluye el bloque Solución en negrita"
+        },
+        {
+          "type": "not_contains_any",
+          "values": [
+            "Resumen:",
+            "## Resumen"
+          ],
+          "description": "No agrega un encabezado Resumen"
+        }
+      ]
+    },
+    {
+      "id": "draft-security-issue-p1",
+      "description": "Un riesgo de seguridad se clasifica como P1 con el badge naranja.",
+      "input": "Usando pr-inline-comment-template, dame solo un borrador sin publicar: en `api/users/search.ts` línea 31 se arma la query SQL concatenando `req.query.name` sin parametrizar, lo que permite SQL injection en el buscador de usuarios. No ejecutes gh.",
+      "assertions": [
+        {
+          "type": "contains",
+          "value": "img.shields.io/badge/P1-orange?style=flat",
+          "description": "Clasifica el hallazgo como P1 con su URL de badge"
+        },
+        {
+          "type": "regex",
+          "pattern": "Solución\\*\\*",
+          "description": "Incluye el bloque Solución"
+        },
+        {
+          "type": "contains_any",
+          "values": [
+            "parametriz",
+            "placeholder",
+            "prepared"
+          ],
+          "description": "La solución es concreta: parametrizar la query"
+        }
+      ]
+    },
+    {
+      "id": "draft-minor-cleanup-p3-without-details",
+      "description": "Un cleanup menor y obvio usa P3 y no incluye el bloque details.",
+      "input": "Usando pr-inline-comment-template, solo el texto, sin publicar: en `src/utils/format.ts` línea 7 quedó un `console.log(value)` de debug. Es un fix de una línea. No ejecutes gh.",
+      "assertions": [
+        {
+          "type": "contains",
+          "value": "img.shields.io/badge/P3-blue?style=flat",
+          "description": "Clasifica el hallazgo como P3 con su URL de badge"
+        },
+        {
+          "type": "not_contains_any",
+          "values": [
+            "<details>",
+            "Pasos sugeridos"
+          ],
+          "description": "No agrega details ni pasos cuando el fix es obvio"
+        },
+        {
+          "type": "regex",
+          "pattern": "Solución\\*\\*",
+          "description": "Incluye el bloque Solución"
+        }
+      ]
+    },
+    {
+      "id": "publishes-inline-by-default",
+      "description": "Sin pedido de borrador, el plan es publicar inline: busca comentarios propios, obtiene el head commit y usa pulls/{n}/comments con commit_id, path, line y side=RIGHT.",
+      "input": "Usando pr-inline-comment-template: dejá un comentario en el PR #128 de `acme/web` sobre `src/cart/discount.ts` línea 54, que forma parte del diff: el descuento se aplica dos veces cuando el cupón es acumulable. No ejecutes gh ni publiques nada en esta prueba: describí paso a paso los comandos exactos que correrías y el comentario que publicarías.",
+      "assertions": [
+        {
+          "type": "contains",
+          "value": "gh api user",
+          "description": "Obtiene el usuario actual para buscar comentarios propios y evitar duplicados"
+        },
+        {
+          "type": "contains_any",
+          "values": [
+            "headRefOid",
+            "commit_id"
+          ],
+          "description": "Usa el head commit del PR al publicar"
+        },
+        {
+          "type": "regex",
+          "pattern": "pulls/(\\{?pr_number\\}?|128)/comments",
+          "description": "Publica como comentario inline de review"
+        },
+        {
+          "type": "regex",
+          "pattern": "side[^a-z]{0,6}RIGHT",
+          "description": "Ancla el comentario al lado RIGHT del diff"
+        }
+      ]
+    },
+    {
+      "id": "no-changed-line-uses-pr-comment",
+      "description": "Si no hay una línea cambiada precisa, publica un comentario normal del PR vía issues/{n}/comments en lugar de inventar una ubicación.",
+      "input": "Usando pr-inline-comment-template: en el PR #77 de `acme/api` quiero comentar que falta cubrir con tests el flujo de reintentos; no hay una línea concreta del diff para anclarlo. No ejecutes gh ni publiques nada en esta prueba: describí el comando exacto que usarías y el comentario.",
+      "assertions": [
+        {
+          "type": "regex",
+          "pattern": "issues/(\\{?pr_number\\}?|77)/comments",
+          "description": "Publica como comentario normal del PR"
+        },
+        {
+          "type": "not_contains_any",
+          "values": [
+            "side=RIGHT",
+            "\"side\": \"RIGHT\""
+          ],
+          "description": "No inventa una ubicación inline"
+        },
+        {
+          "type": "regex",
+          "pattern": "Solución\\*\\*",
+          "description": "Mantiene el template con bloque Solución"
+        }
+      ]
+    },
+    {
+      "id": "english-request-spanish-comment",
+      "description": "Aunque el pedido llegue en inglés, el comentario visible para el autor queda en español y conserva los identificadores originales.",
+      "input": "Using pr-inline-comment-template, draft only, do not publish: in `src/hooks/useCart.ts` line 22 the `useEffect` has no dependency array, so it refetches the cart on every render. Do not run gh; return only the comment text.",
+      "assertions": [
+        {
+          "type": "regex",
+          "pattern": "Solución\\*\\*",
+          "description": "Usa el bloque Solución en español"
+        },
+        {
+          "type": "contains",
+          "value": "useEffect",
+          "description": "Conserva los identificadores en su idioma original"
+        },
+        {
+          "type": "not_contains_any",
+          "values": [
+            "Solution",
+            "Suggested fix",
+            "Steps to"
+          ],
+          "description": "No escribe el comentario en inglés"
+        }
+      ]
+    }
+  ]
+}

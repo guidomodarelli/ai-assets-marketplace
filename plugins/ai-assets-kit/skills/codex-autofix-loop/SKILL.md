@@ -15,7 +15,7 @@ metadata:
 Loop local que escucha comentarios de **Codex** (`chatgpt-codex-connector[bot]`)
 en un PR y **spawnea subagentes en paralelo** (uno por GRUPO de archivo, tantos
 como permitan la CPU, la RAM y el disco libres en cada vuelta) que delegan el fix en la skill
-`fix-in-ephemeral-clone` (skill instalada aparte, fuera de este plugin) —invocada vía
+[`fix-in-ephemeral-clone`](../fix-in-ephemeral-clone/SKILL.md) —invocada vía
 la herramienta `Skill` (`/fix-in-ephemeral-clone`)— tratando cada comentario
 como la "issue" a resolver (clone efímero depth-1 → fix → validar → push a la rama
 del PR). Cada subagente trabaja en su propio clone efímero aislado; como todos
@@ -170,8 +170,6 @@ Reglas del pedido a Codex:
 > solo arma el input (comentarios agrupados por archivo → issue), spawnea un
 > subagente por grupo (con concurrencia según recursos libres) que la invoca en paralelo, y
 > hace el closeout. Cualquier cambio al mecanismo de clone/fix/push vive en esa skill.
-> `fix-in-ephemeral-clone` no viene en este plugin: si no está instalada, no arranques el
-> loop en modo `local` ni `auto`; avisá al usuario y ofrecé el modo `codex`.
 
 > Es un complemento del workflow de CI `.github/workflows/codex-autofix.yml`.
 > El **Action** es la persistencia real 24/7 (webhook, sin sesión). Este **loop local**

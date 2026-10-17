@@ -1,0 +1,313 @@
+{
+  "schema_version": 2,
+  "skill": "pr-description-template",
+  "description": "Evalúa el template de PR: línea de metadata con el conteo correcto de archivos de código, exclusiones (tests, mocks, assets, estilos, tooling, docs), modo traceability-only sin retemplar, Pruebas Manuales y Notas para el Revisor, carga obligatoria antes de gh pr create y manejo de capturas (subida a pr-assets, omisión con motivo y detención del servidor propio).",
+  "test_cases": [
+    {
+      "id": "metadata-counts-code-files",
+      "description": "Cuenta solo los archivos de código elegibles (2) y excluye tests, mocks, imagen y SCSS en la línea de metadata.",
+      "input": "Componé un body nuevo de PR en full composition. El diff tiene `src/App.tsx`, `src/utils/date.ts`, `src/App.test.tsx`, `tests/helpers.ts`, `__mocks__/client.ts`, `assets/logo.svg` y `styles/theme.scss`. Agregá metadata inicial y completá el template sin placeholders. No ejecutes git ni gh: devolvé solo el body en Markdown.",
+      "assertions": [
+        {
+          "type": "contains",
+          "value": "<div align=\"right\"><sup>",
+          "description": "Incluye la línea de metadata alineada a la derecha"
+        },
+        {
+          "type": "contains",
+          "value": "Archivos de código modificados: 2<",
+          "description": "Cuenta exactamente 2 archivos de código"
+        },
+        {
+          "type": "contains",
+          "value": "## 📝 Descripción",
+          "description": "Sigue con la sección Descripción del template"
+        }
+      ]
+    },
+    {
+      "id": "metadata-zero-code-files",
+      "description": "Conserva la línea de metadata con 0 cuando no hay archivos de código elegibles.",
+      "input": "Componé un body de PR en full composition para un diff que solo contiene `src/Button.spec.tsx`, `__tests__/setup.ts`, `mocks/api.ts`, `public/icon.png` y `styles/layout.scss`. No hay archivos de código elegibles. No ejecutes git ni gh: devolvé solo el body en Markdown.",
+      "assertions": [
+        {
+          "type": "contains",
+          "value": "Archivos de código modificados: 0<",
+          "description": "Muestra la línea de metadata con conteo 0 en vez de omitirla"
+        },
+        {
+          "type": "contains",
+          "value": "## 📝 Descripción",
+          "description": "Mantiene la sección Descripción después de la metadata"
+        },
+        {
+          "type": "not_contains_any",
+          "values": [
+            "Archivos de código modificados: [1-9]"
+          ],
+          "description": "No cuenta archivos excluidos"
+        }
+      ]
+    },
+    {
+      "id": "metadata-excludes-tooling-and-config",
+      "description": "Cuenta 3 archivos y excluye dot directories, dotfiles, config de raíz, tooling, mocks, tests, stories, .d.ts y catálogos JSON.",
+      "input": "Componé un body nuevo de PR en full composition. El diff tiene `app/pages/home/index.tsx`, `api/services/users.ts`, `src/constants/config.ts`, `.agents/hooks/sync.js`, `.claude/skills/review/helper.ts`, `.eslintrc.js`, `storybook/.storybook/test-runner.js`, `config/default.js`, `jest.config.js`, `eslint-import-core-modules.js`, `mocks/op-assignment.js`, `tests/unit/home.spec.tsx`, `src/Button.stories.tsx`, `src/types.d.ts` y `app/translations/en/messages.json`. No ejecutes git ni gh: devolvé solo el body en Markdown.",
+      "assertions": [
+        {
+          "type": "contains",
+          "value": "Archivos de código modificados: 3<",
+          "description": "Cuenta exactamente 3 archivos de código"
+        },
+        {
+          "type": "not_contains_any",
+          "values": [
+            "Archivos de código modificados: [0-24-9]<",
+            "Archivos de código modificados: 1[0-9]"
+          ],
+          "description": "No usa otro conteo que incluya archivos excluidos"
+        },
+        {
+          "type": "contains",
+          "value": "## 📝 Descripción",
+          "description": "Sigue con la sección Descripción del template"
+        }
+      ]
+    },
+    {
+      "id": "traceability-only-preserves-body",
+      "description": "En traceability-only solo toca el backlink Jira, sin agregar ni recalcular la metadata ni retemplar el body.",
+      "input": "Aplicá traceability-only sobre un PR existente para agregar o normalizar backlink Jira. El body actual ya tiene sus secciones y no debe retemplarse. No ejecutes gh: describí qué cambiás y qué preservás.",
+      "assertions": [
+        {
+          "type": "contains_any",
+          "values": [
+            "Jira"
+          ],
+          "description": "Trabaja sobre el backlink Jira"
+        },
+        {
+          "type": "contains_any",
+          "values": [
+            "preserv",
+            "intact",
+            "sin modificar",
+            "no modific",
+            "no toc"
+          ],
+          "description": "Preserva título y contenido existente"
+        },
+        {
+          "type": "not_contains_any",
+          "values": [
+            "Archivos de código modificados: [0-9]"
+          ],
+          "description": "No agrega ni recalcula la línea de metadata de archivos"
+        }
+      ]
+    },
+    {
+      "id": "docs-only-manual-tests-not-applicable",
+      "description": "Con un diff solo de docs, muestra conteo 0, reemplaza Pruebas Manuales por una línea 'No aplica' y no agrega Decisiones técnicas relevantes.",
+      "input": "Componé un body nuevo de PR en full composition para un diff que solo modifica `.agents/skills/logger/SKILL.md`, `AGENTS.md` y `docs/setup.md`. No ejecutes git ni gh: devolvé solo el body en Markdown.",
+      "assertions": [
+        {
+          "type": "contains",
+          "value": "Archivos de código modificados: 0<",
+          "description": "Muestra conteo 0"
+        },
+        {
+          "type": "contains",
+          "value": "No aplica:",
+          "description": "Pruebas Manuales usa una única línea 'No aplica: <motivo>'"
+        },
+        {
+          "type": "not_contains_any",
+          "values": [
+            "Decisiones técnicas relevantes"
+          ],
+          "description": "No agrega una sección Decisiones técnicas relevantes"
+        }
+      ]
+    },
+    {
+      "id": "technical-decision-in-reviewer-notes",
+      "description": "La decisión técnica va dentro de Notas para el Revisor, sin sección separada, y Pruebas Manuales lista pasos reproducibles.",
+      "input": "Componé un body nuevo de PR en full composition para un diff que cambia `api/services/orders.ts` eligiendo reintentos solo para errores temporales en lugar de reintentar todo. No ejecutes git ni gh: devolvé solo el body en Markdown.",
+      "assertions": [
+        {
+          "type": "contains",
+          "value": "Notas para el Revisor",
+          "description": "Incluye Notas para el Revisor"
+        },
+        {
+          "type": "contains_any",
+          "values": [
+            "temporal",
+            "transitori"
+          ],
+          "description": "Explica la decisión de reintentar solo errores temporales"
+        },
+        {
+          "type": "contains",
+          "value": "Pruebas Manuales",
+          "description": "Incluye Pruebas Manuales"
+        },
+        {
+          "type": "not_contains_any",
+          "values": [
+            "Decisiones técnicas relevantes"
+          ],
+          "description": "No crea una sección separada de decisiones técnicas"
+        }
+      ]
+    },
+    {
+      "id": "implicit-pr-uses-full-template",
+      "description": "Usa el template completo aunque el usuario nunca dijo 'PR', cuando hay que abrir uno como paso de publicar una librería.",
+      "input": "El usuario pidió 'publicá la librería y actualizala en la app'. Para publicar, el repo de la librería exige que los cambios entren a `main` por PR, así que hay que abrir uno con `gh pr create` desde `feature/dialog-close-button`. El diff toca `src/components/dialog.tsx`, `src/motion/motion-slot.tsx`, `src/constants/motion.ts`, `stories/dialog.stories.tsx` y `tests/browser/motion.spec.ts`. No ejecutes gh: devolvé el body que pasarías a `gh pr create`.",
+      "assertions": [
+        {
+          "type": "contains",
+          "value": "Archivos de código modificados: 3<",
+          "description": "Cuenta solo los tres archivos de src/"
+        },
+        {
+          "type": "contains",
+          "value": "## 📝 Descripción",
+          "description": "Sigue el template completo desde Descripción"
+        },
+        {
+          "type": "contains",
+          "value": "New Feature",
+          "description": "Marca New Feature como tipo de cambio"
+        },
+        {
+          "type": "contains",
+          "value": "Pruebas Manuales",
+          "description": "Incluye Pruebas Manuales reproducibles"
+        }
+      ]
+    },
+    {
+      "id": "screenshots-uploaded-to-pr-assets",
+      "description": "Para un cambio visual con app documentada y sin login, planifica capturas antes/después subidas con upload-pr-image.sh a pr-assets.",
+      "input": "Componé y creá el PR en full composition para un diff que cambia `components/profile-card/styles.module.scss` (padding del avatar) en un repo cuyo `AGENTS.md` dice que la app se levanta con `pnpm run dev` en `https://dev.example.app`. La pantalla del perfil es accesible sin login. No ejecutes nada: describí paso a paso cómo resolvés las capturas y qué sección agregás al body.",
+      "assertions": [
+        {
+          "type": "contains",
+          "value": "pnpm run dev",
+          "description": "Levanta la app con el comando documentado en AGENTS.md"
+        },
+        {
+          "type": "contains",
+          "value": "upload-pr-image.sh",
+          "description": "Sube las capturas con el script de la skill"
+        },
+        {
+          "type": "contains",
+          "value": "pr-assets",
+          "description": "Las imágenes van a la rama pr-assets"
+        },
+        {
+          "type": "contains",
+          "value": "Capturas",
+          "description": "Incluye la sección de capturas en el body"
+        },
+        {
+          "type": "contains_any",
+          "values": [
+            "antes",
+            "before"
+          ],
+          "description": "Captura el estado antes y después"
+        }
+      ]
+    },
+    {
+      "id": "no-screenshot-without-run-instructions",
+      "description": "Sin instrucciones para levantar la app, no inventa un comando y deja 'Sin captura: <motivo>' en Notas para el Revisor.",
+      "input": "Componé el body en full composition para un diff que cambia `src/components/Button.tsx` (color del hover), pero el repo no documenta cómo levantar la app y no hay servidor corriendo. No ejecutes nada: devolvé solo el body en Markdown.",
+      "assertions": [
+        {
+          "type": "contains",
+          "value": "Sin captura:",
+          "description": "Agrega la línea 'Sin captura: <motivo>'"
+        },
+        {
+          "type": "contains",
+          "value": "Notas para el Revisor",
+          "description": "La línea va en Notas para el Revisor"
+        },
+        {
+          "type": "not_contains_any",
+          "values": [
+            "upload-pr-image.sh"
+          ],
+          "description": "No intenta subir capturas inexistentes"
+        }
+      ]
+    },
+    {
+      "id": "no-harness-screenshot-behind-login",
+      "description": "Si la pantalla exige login sin sesión de prueba, no captura un arnés HTML: omite Capturas y deja 'Sin captura: <motivo>'.",
+      "input": "Componé y creá el PR para un cambio de padding en `components/composer/styles.module.scss`. La pantalla del composer exige login y no hay sesión abierta ni credenciales de prueba, pero podrías renderizar el SCSS compilado en una página HTML suelta con Playwright. No ejecutes nada: describí cómo resolvés las capturas y devolvé el body.",
+      "assertions": [
+        {
+          "type": "contains",
+          "value": "Sin captura:",
+          "description": "Agrega la línea 'Sin captura: <motivo>'"
+        },
+        {
+          "type": "contains_any",
+          "values": [
+            "login",
+            "sesión",
+            "credenciales"
+          ],
+          "description": "El motivo menciona el login sin sesión de prueba"
+        },
+        {
+          "type": "not_contains_any",
+          "values": [
+            "upload-pr-image.sh"
+          ],
+          "description": "No sube capturas de un arnés"
+        }
+      ]
+    },
+    {
+      "id": "stop-own-dev-server-after-screenshots",
+      "description": "Detiene el servidor que levantó tras la última captura y verifica el puerto, sin tocar el Storybook del usuario.",
+      "input": "Componé y creá el PR para un cambio de margen en `components/header/styles.module.scss`. No hay servidor corriendo; el `README.md` dice que la app se levanta con `npm run dev` en `http://localhost:3000` y la pantalla es accesible sin login. En otra pestaña de terminal el usuario tiene corriendo `npm run storybook` en el puerto 6006. No ejecutes nada: describí paso a paso qué hacés con los servidores y las capturas.",
+      "assertions": [
+        {
+          "type": "contains",
+          "value": "npm run dev",
+          "description": "Levanta la app con el comando del README"
+        },
+        {
+          "type": "contains_any",
+          "values": [
+            "deten",
+            "detien",
+            "stop",
+            "frenar",
+            "apag"
+          ],
+          "description": "Detiene el servidor que levantó"
+        },
+        {
+          "type": "contains",
+          "value": "3000",
+          "description": "Verifica que el puerto 3000 ya no responde"
+        },
+        {
+          "type": "regex",
+          "pattern": "(no|sin) (detengo|detener|deten|toco|tocar|cierro|cerrar|apago|apagar)[^.]*(storybook|6006)|(storybook|6006)[^.]*(no se toca|queda corriendo|sigue corriendo|del usuario|intacto)",
+          "description": "No detiene el Storybook del puerto 6006 que ya era del usuario"
+        }
+      ]
+    }
+  ]
+}

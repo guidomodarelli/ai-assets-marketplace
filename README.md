@@ -254,6 +254,8 @@ bun run test
 
 `bun run test:review-fix-loop` corre solo la suite del helper de `review-fix-loop`, que usa
 providers falsos y no llama a Claude ni a Codex reales.
+`bun run test:sibling-worktree` corre la suite del helper de `sibling-worktree` sobre repos git
+temporales.
 
 `bun run test:browser` ejecuta pruebas de registro browser desde el venv local,
 sin descargar dependencias. La prueba de lanzamiento real es opt-in mediante

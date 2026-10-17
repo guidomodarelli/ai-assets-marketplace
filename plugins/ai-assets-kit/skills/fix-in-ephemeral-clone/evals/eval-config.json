@@ -1,0 +1,532 @@
+{
+  "schema_version": 2,
+  "skill": "fix-in-ephemeral-clone",
+  "description": "Evalúa el routing entre modo DIRECT, delegación única a inline-thread-autofix y handoff INLINE_THREAD_AUTOFIX; la validación del contrato del handoff, OIDs y backups; los reintentos acotados de push; la seguridad en zsh; la clasificación de drift remoto y la ejecución in_context o la ausencia de executor sin inventar resultados ni mutar GitHub.",
+  "test_cases": [
+    {
+      "id": "inline-url-delegates-once",
+      "description": "Ante una URL de comentario inline sin handoff, delega una sola vez en inline-thread-autofix y se detiene antes de clonar, editar, commitear, pushear o hacer closeout.",
+      "input": "https://github.com/acme/widgets/pull/42#discussion_r123456789\nResuelve este comentario inline.\n\nUsando la skill fix-in-ephemeral-clone, describí paso a paso qué harías con esta solicitud. No ejecutes nada externo: no clones, no edites, no commitees ni pushees.",
+      "assertions": [
+        {
+          "type": "contains",
+          "value": "inline-thread-autofix",
+          "description": "Nombra a inline-thread-autofix como orquestadora"
+        },
+        {
+          "type": "contains_any",
+          "values": [
+            "una vez",
+            "una sola vez",
+            "exactamente una",
+            "única vez",
+            "once",
+            "single"
+          ],
+          "description": "Delega exactamente una vez"
+        },
+        {
+          "type": "contains_any",
+          "values": [
+            "detengo",
+            "detenerse",
+            "me detengo",
+            "se detiene",
+            "antes de clonar",
+            "antes de crear",
+            "antes del clone",
+            "sin clonar",
+            "stop",
+            "before cloning"
+          ],
+          "description": "Detiene el flujo local antes de crear el clone"
+        },
+        {
+          "type": "not_contains_any",
+          "values": [
+            "mktemp -d",
+            "git push origin",
+            "[-]-single-branch --no-tags"
+          ],
+          "description": "No planifica clone, push ni devuelve un resultado de handoff propio"
+        }
+      ]
+    },
+    {
+      "id": "handoff-complete-executes",
+      "description": "Con un handoff completo usa la branch y los OIDs entregados, valida HEAD antes de editar, devuelve HANDOFF_RESULT con SHA y evidencia, y no muta GitHub.",
+      "input": "HANDOFF: INLINE_THREAD_AUTOFIX\nsource_url: https://github.com/acme/widgets/pull/42#discussion_r123456789\nimplementation_repo: acme/widgets\nimplementation_pr: 42\nimplementation_branch: feature/fix-review\nimplementation_base: master\nhandoff_id: eval-handoff-1\nexpected_head_oid: 0123456789012345678901234567890123456789\nexpected_base_oid: 9876543210987654321098765432109876543210\nfinding_anchor: src/service.js:42\nfinding_summary: Evitar exposición de datos upstream\nacceptance_criteria: DTO allowlisted y test negativo\nstack_plan: none\nissue: none\n\nUsando la skill fix-in-ephemeral-clone, describí el plan de ejecución de este handoff y el formato del resultado que devolverías. No ejecutes nada externo.",
+      "assertions": [
+        {
+          "type": "contains",
+          "value": "HANDOFF_RESULT",
+          "description": "Devuelve el bloque HANDOFF_RESULT"
+        },
+        {
+          "type": "contains",
+          "value": "feature/fix-review",
+          "description": "Usa implementation_branch del header sin inferir otro destino"
+        },
+        {
+          "type": "contains_any",
+          "values": [
+            "expected_head_oid",
+            "0123456789012345678901234567890123456789"
+          ],
+          "description": "Compara el HEAD remoto con expected_head_oid antes de editar"
+        },
+        {
+          "type": "contains_any",
+          "values": [
+            "commit_sha",
+            "SHA completo",
+            "full SHA"
+          ],
+          "description": "Reporta el SHA completo del commit"
+        },
+        {
+          "type": "contains_any",
+          "values": [
+            "no publica",
+            "no publico",
+            "no muta",
+            "no mutar",
+            "sin mutar",
+            "no hace closeout",
+            "no hago closeout",
+            "sin closeout",
+            "no reply",
+            "no publish"
+          ],
+          "description": "No publica reply, review, issue ni resolución en GitHub"
+        }
+      ]
+    },
+    {
+      "id": "handoff-incomplete-rejected",
+      "description": "Rechaza un handoff al que le faltan campos obligatorios antes de editar o pushear, sin inventar ancla ni criterios.",
+      "input": "HANDOFF: INLINE_THREAD_AUTOFIX\nsource_url: https://github.com/acme/widgets/pull/42#discussion_r123456789\nimplementation_repo: acme/widgets\nimplementation_pr: 42\nimplementation_branch: feature/fix-review\nimplementation_base: master\nhandoff_id: eval-handoff-1\nexpected_head_oid: 0123456789012345678901234567890123456789\n\nUsando la skill fix-in-ephemeral-clone, describí cómo procesarías este handoff. No ejecutes nada externo.",
+      "assertions": [
+        {
+          "type": "contains_any",
+          "values": [
+            "incompleto",
+            "incompleta",
+            "faltan",
+            "falta",
+            "faltantes",
+            "incomplete",
+            "missing"
+          ],
+          "description": "Detecta que el handoff está incompleto"
+        },
+        {
+          "type": "contains_any",
+          "values": [
+            "finding_anchor",
+            "acceptance_criteria",
+            "expected_base_oid",
+            "stack_plan"
+          ],
+          "description": "Nombra los campos obligatorios ausentes del contrato"
+        },
+        {
+          "type": "contains_any",
+          "values": [
+            "antes de editar",
+            "sin editar",
+            "no edito",
+            "no commit",
+            "sin commit",
+            "no push",
+            "sin push",
+            "no pusheo",
+            "before editing"
+          ],
+          "description": "No crea commit ni push con el handoff incompleto"
+        },
+        {
+          "type": "not_contains_any",
+          "values": [
+            "status: success",
+            "executor_status: completed"
+          ],
+          "description": "No reporta éxito ni inicia closeout"
+        }
+      ]
+    },
+    {
+      "id": "direct-mode-issue",
+      "description": "Una solicitud de issue sin URL de PR se clasifica como DIRECT y sigue el flujo completo: branch/upstream, clone depth-1, validación, push y cleanup del clone propio.",
+      "input": "Corregí issue #901 en un clone efímero, validá, commiteá, pusheá a la branch actual y limpiá el clone.\n\nUsando la skill fix-in-ephemeral-clone, describí el plan paso a paso. No ejecutes nada externo.",
+      "assertions": [
+        {
+          "type": "contains",
+          "value": "DIRECT",
+          "description": "Clasifica la solicitud sin URL de PR como modo DIRECT"
+        },
+        {
+          "type": "contains_any",
+          "values": [
+            "upstream",
+            "branch actual",
+            "current branch"
+          ],
+          "description": "Descubre branch y upstream actuales"
+        },
+        {
+          "type": "contains_any",
+          "values": [
+            "[-]-depth 1",
+            "depth-1",
+            "depth 1"
+          ],
+          "description": "Crea un clone depth-1 nuevo"
+        },
+        {
+          "type": "contains_any",
+          "values": [
+            "marker",
+            "solo el clone",
+            "únicamente el clone",
+            "clone propio",
+            "only the clone",
+            "own clone"
+          ],
+          "description": "Limpia únicamente el clone creado por la ejecución"
+        }
+      ]
+    },
+    {
+      "id": "malformed-review-url-delegates",
+      "description": "Una URL de review con fragment inválido se trata como intento de review y se delega la validación a inline-thread-autofix, sin interpretarla como issue genérica.",
+      "input": "https://github.com/acme/widgets/pull/42#pullrequestreview-invalid\nAplicá cualquier fix.\n\nUsando la skill fix-in-ephemeral-clone, describí qué harías con esta solicitud. No ejecutes nada externo.",
+      "assertions": [
+        {
+          "type": "contains",
+          "value": "inline-thread-autofix",
+          "description": "Delega la validación al orquestador"
+        },
+        {
+          "type": "contains_any",
+          "values": [
+            "inválid",
+            "malformed",
+            "malformad",
+            "invalid",
+            "mal formad"
+          ],
+          "description": "Reconoce el fragment de review inválido"
+        },
+        {
+          "type": "not_contains_any",
+          "values": [
+            "mktemp -d",
+            "git push origin",
+            "[-]-single-branch --no-tags"
+          ],
+          "description": "No crea clone ni mutación"
+        }
+      ]
+    },
+    {
+      "id": "handoff-versioned-no-stack",
+      "description": "Con un handoff completo y stack_plan sin layers valida HEAD y base y devuelve BACKUPS_NOT_APPLICABLE sin inventar refs ni hacer closeout.",
+      "input": "HANDOFF: INLINE_THREAD_AUTOFIX\nsource_url: https://github.com/acme/widgets/pull/42#discussion_r123456789\nimplementation_repo: acme/widgets\nimplementation_pr: 42\nimplementation_branch: feature/fix-review\nimplementation_base: master\nhandoff_id: eval-handoff-1\nexpected_head_oid: 0123456789012345678901234567890123456789\nexpected_base_oid: 9876543210987654321098765432109876543210\nsnapshot_id: run-1\nfinding_anchor: src/service.js:42\nfinding_summary: Evitar exposición de datos upstream\nacceptance_criteria: DTO allowlisted y test negativo\nvalidation_plan: paths=src/service.js;focused_tests=service.spec.js\nstack_plan: {schema_version:1,layers:[],order:[]}\nbackup_manifest: none\nissue: none\n\nUsando la skill fix-in-ephemeral-clone, describí el plan de ejecución y el HANDOFF_RESULT esperado. No ejecutes nada externo.",
+      "assertions": [
+        {
+          "type": "contains_any",
+          "values": [
+            "schema_version",
+            "campos",
+            "fields"
+          ],
+          "description": "Valida schema_version y los campos del handoff"
+        },
+        {
+          "type": "contains_any",
+          "values": [
+            "expected_base_oid",
+            "9876543210987654321098765432109876543210"
+          ],
+          "description": "Compara expected_head_oid y expected_base_oid antes de editar"
+        },
+        {
+          "type": "contains",
+          "value": "BACKUPS_NOT_APPLICABLE",
+          "description": "Devuelve BACKUPS_NOT_APPLICABLE sin inventar refs"
+        },
+        {
+          "type": "not_contains_any",
+          "values": [
+            "backups: BACKUPS_CLEANED",
+            "backups: BACKUPS_PENDING_CLOSEOUT"
+          ],
+          "description": "No reporta un estado de backups que implique refs o cleanup inexistentes"
+        }
+      ]
+    },
+    {
+      "id": "nff-retry-limit-auth-stops",
+      "description": "Reintenta solo los rechazos non-fast-forward dentro del límite de tres ciclos, se detiene ante un error de autenticación y conserva el clone.",
+      "input": "Corregí issue #901 en clone efímero. Push devuelve non-fast-forward dos veces y luego error de autenticación; reintentá hasta que pase.\n\nUsando la skill fix-in-ephemeral-clone, describí cómo manejarías cada rechazo de push. No ejecutes nada externo.",
+      "assertions": [
+        {
+          "type": "contains_any",
+          "values": [
+            "NFF",
+            "non-fast-forward"
+          ],
+          "description": "Clasifica el NFF como reintentable"
+        },
+        {
+          "type": "contains_any",
+          "values": [
+            "3 ciclos",
+            "tres ciclos",
+            "3 intentos",
+            "tres intentos",
+            "máximo 3",
+            "máximo de 3",
+            "maximum of 3",
+            "3 cycles",
+            "three cycles"
+          ],
+          "description": "Limita los reintentos a tres ciclos por branch"
+        },
+        {
+          "type": "contains_any",
+          "values": [
+            "autenticación",
+            "authentication",
+            "auth"
+          ],
+          "description": "Identifica el error de autenticación como no reintentable"
+        },
+        {
+          "type": "contains_any",
+          "values": [
+            "conserv",
+            "retengo",
+            "retenido",
+            "retain",
+            "preserv"
+          ],
+          "description": "Reporta estado fallido y conserva el clone"
+        }
+      ]
+    },
+    {
+      "id": "zsh-env-glob-refspec",
+      "description": "En zsh enumera .env/.env.* sin depender de un glob con nomatch, evita la variable `path`, delimita variables antes de `:` en refspecs y no trata errores locales como NFF.",
+      "input": "Corregí issue #901 desde zsh: copiá configuración opcional `.env.*` y publicá el commit a la branch autorizada.\n\nUsando la skill fix-in-ephemeral-clone, describí los comandos zsh y precauciones que usarías. No ejecutes nada externo.",
+      "assertions": [
+        {
+          "type": "contains_any",
+          "values": [
+            "nomatch",
+            "NULL_GLOB",
+            "null_glob",
+            "(N)",
+            "find "
+          ],
+          "description": "Enumera .env/.env.* sin depender de un glob zsh sin coincidencias"
+        },
+        {
+          "type": "contains_any",
+          "values": [
+            "$PATH",
+            "file_path"
+          ],
+          "description": "No usa `path` como variable porque modifica el array especial de $PATH"
+        },
+        {
+          "type": "regex",
+          "pattern": "\\$\\{[A-Za-z_]+\\}:",
+          "description": "Usa ${variable}:sufijo al concatenar variables y dos puntos en refspecs"
+        },
+        {
+          "type": "contains_any",
+          "values": [
+            "no es NFF",
+            "no es un NFF",
+            "not an NFF",
+            "not a NFF",
+            "error local",
+            "local error",
+            "no habilita reintentos"
+          ],
+          "description": "Distingue un error local de expansión o refspec de un NFF remoto"
+        }
+      ]
+    },
+    {
+      "id": "drift-independent-reuse",
+      "description": "Un drift remoto aislado (mensaje de timeout y su test) se clasifica REMOTE_DRIFT_INDEPENDENT, reutiliza gates previos y ejecuta solo integridad final.",
+      "input": "Después del rebase del clone, el remoto solo cambió un mensaje de timeout y el test aislado correspondiente; servicio, dependencias, configuración, fixtures compartidos y finding permanecen iguales. Publicá sin repetir todos los gates.\n\nUsando la skill fix-in-ephemeral-clone, describí cómo clasificarías el drift y qué validación ejecutarías antes de publicar. No ejecutes nada externo.",
+      "assertions": [
+        {
+          "type": "contains",
+          "value": "REMOTE_DRIFT_INDEPENDENT",
+          "description": "Clasifica el drift como independiente"
+        },
+        {
+          "type": "contains_any",
+          "values": [
+            "manifest",
+            "name-status"
+          ],
+          "description": "Compara manifest y superficie antes de clasificar"
+        },
+        {
+          "type": "contains_any",
+          "values": [
+            "integridad",
+            "integrity"
+          ],
+          "description": "Ejecuta integridad final de diff, paths, manifest y OIDs"
+        },
+        {
+          "type": "contains",
+          "value": "validation_reused",
+          "description": "Reporta gates reutilizados separados de los comandos ejecutados"
+        }
+      ]
+    },
+    {
+      "id": "drift-related-revalidate",
+      "description": "Un drift que toca lockfile, configuración de build y fixture compartido se clasifica REMOTE_DRIFT_RELATED, invalida resultados previos y revalida antes de publicar.",
+      "input": "Después del rebase, cambió lockfile, configuración de build y fixture compartido usado por los tests del fix. El servicio no cambió; publicá sin revalidar.\n\nUsando la skill fix-in-ephemeral-clone, describí cómo clasificarías el drift y qué harías antes de publicar. No ejecutes nada externo.",
+      "assertions": [
+        {
+          "type": "contains",
+          "value": "REMOTE_DRIFT_RELATED",
+          "description": "Trata lockfile, configuración y fixture compartido como drift relacionado"
+        },
+        {
+          "type": "contains_any",
+          "values": [
+            "revalid",
+            "re-valid",
+            "volver a validar",
+            "vuelvo a validar",
+            "rerun",
+            "re-ejecut"
+          ],
+          "description": "Revalida tests y superficies integradas requeridas"
+        },
+        {
+          "type": "contains_any",
+          "values": [
+            "no reutiliz",
+            "no puedo reutilizar",
+            "no se reutiliz",
+            "invalida",
+            "invalidar",
+            "not reuse",
+            "cannot reuse"
+          ],
+          "description": "No reutiliza silenciosamente resultados anteriores"
+        },
+        {
+          "type": "contains_any",
+          "values": [
+            "no publico",
+            "no publicar",
+            "sin publicar",
+            "detengo",
+            "detener",
+            "conserv",
+            "do not publish"
+          ],
+          "description": "No publica éxito con validación incompleta"
+        }
+      ]
+    },
+    {
+      "id": "in-context-sync-handoff",
+      "description": "Cuando el handoff llega por carga de Skill sin task handle, ejecuta in_context de forma síncrona y devuelve HANDOFF_RESULT solo tras evidencia real.",
+      "input": "HANDOFF: INLINE_THREAD_AUTOFIX\nsource_url: https://github.com/acme/widgets/pull/42#discussion_r123456789\nimplementation_repo: acme/widgets\nimplementation_pr: 42\nimplementation_branch: feature/fix-review\nimplementation_base: master\nhandoff_id: eval-in-context-1\nexpected_head_oid: 0123456789012345678901234567890123456789\nexpected_base_oid: 9876543210987654321098765432109876543210\nfinding_anchor: src/service.js:42\nfinding_summary: Corregir contrato\nacceptance_criteria: Test focal verde\nvalidation_plan: tests/service.spec.js\nstack_plan: none\nbackup_manifest: none\nissue: none\nSe cargaron instrucciones mediante Skill, no existe task handle. Ejecutá el handoff en contexto actual.\n\nUsando la skill fix-in-ephemeral-clone, describí el modo de ejecución y cuándo devolverías el resultado. No ejecutes nada externo.",
+      "assertions": [
+        {
+          "type": "contains",
+          "value": "in_context",
+          "description": "Usa executor_mode in_context y executor_tool in_context"
+        },
+        {
+          "type": "contains_any",
+          "values": [
+            "síncron",
+            "sincron",
+            "synchronous",
+            "contexto actual",
+            "current context"
+          ],
+          "description": "Distingue la carga síncrona de Skill de un executor background"
+        },
+        {
+          "type": "contains",
+          "value": "HANDOFF_RESULT",
+          "description": "Devuelve HANDOFF_RESULT"
+        },
+        {
+          "type": "contains_any",
+          "values": [
+            "solo después",
+            "sólo después",
+            "solo tras",
+            "únicamente después",
+            "recién después",
+            "only after"
+          ],
+          "description": "Devuelve el resultado completo solo después de evidencia real"
+        }
+      ]
+    },
+    {
+      "id": "executor-missing",
+      "description": "Sin herramienta Agent/job, sin handle y sin poder continuar en contexto, devuelve HANDOFF_EXECUTOR_MISSING de inmediato sin inventar clone, commit, push ni progreso.",
+      "input": "HANDOFF: INLINE_THREAD_AUTOFIX\nsource_url: https://github.com/acme/widgets/pull/42#discussion_r123456789\nimplementation_repo: acme/widgets\nimplementation_pr: 42\nimplementation_branch: feature/fix-review\nimplementation_base: master\nhandoff_id: eval-no-executor-1\nexpected_head_oid: 0123456789012345678901234567890123456789\nexpected_base_oid: 9876543210987654321098765432109876543210\nfinding_anchor: src/service.js:42\nfinding_summary: Corregir contrato\nacceptance_criteria: Test focal verde\nvalidation_plan: tests/service.spec.js\nstack_plan: none\nbackup_manifest: none\nissue: none\nNo existe herramienta Agent/job, no hay handle y contexto no puede continuar.\n\nUsando la skill fix-in-ephemeral-clone, describí qué devolverías. No ejecutes nada externo.",
+      "assertions": [
+        {
+          "type": "contains",
+          "value": "HANDOFF_EXECUTOR_MISSING",
+          "description": "Reporta la ausencia real de executor"
+        },
+        {
+          "type": "contains_any",
+          "values": [
+            "no invent",
+            "sin inventar",
+            "nunca invent",
+            "do not invent",
+            "without inventing"
+          ],
+          "description": "No inventa path, branch, HEAD ni resultado"
+        },
+        {
+          "type": "not_contains_any",
+          "values": [
+            "status: success",
+            "executor_status: completed"
+          ],
+          "description": "No reporta progreso ni éxito"
+        },
+        {
+          "type": "contains_any",
+          "values": [
+            "nueva ejecución",
+            "re-ejecut",
+            "reejecut",
+            "volver a lanzar",
+            "relanzar",
+            "autorizada",
+            "new run",
+            "new execution"
+          ],
+          "description": "Requiere una nueva ejecución autorizada"
+        }
+      ]
+    }
+  ]
+}

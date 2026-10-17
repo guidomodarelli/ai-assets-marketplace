@@ -1,0 +1,178 @@
+{
+  "schema_version": 2,
+  "skill": "feature-branch-pr",
+  "description": "Evalúa el cierre branch + commit + push + PR: crear feature/* solo desde una rama default, reutilizar ramas no default, detenerse si ya hay PR abierto, base por fallback remoto develop → master → main, body con pr-description-template, bloqueos sin fixes ni bypass y tabla resumen final en español.",
+  "test_cases": [
+    {
+      "id": "default-branch-creates-feature-branch",
+      "description": "Desde main con cambios sin commitear crea feature/<slug>, commitea en inglés con Conventional Commits, usa pr-description-template y cierra con la tabla resumen.",
+      "input": "Usando feature-branch-pr: estoy en `main`, el working tree tiene cambios sin commitear en `src/checkout/preapproval-link.ts` (agrega el link de preaprobación en el checkout), existen `origin/main` y `origin/develop`, y no hay PR abierto. Subí los cambios y creá el PR. No ejecutes git ni gh: describí el plan paso a paso con los comandos exactos y mostrá la tabla resumen final que devolverías, con valores de ejemplo.",
+      "assertions": [
+        {
+          "type": "regex",
+          "pattern": "(switch -c|checkout -b) \"?feature/[a-z0-9-]+",
+          "description": "Crea una rama feature/<slug> porque está en una rama default"
+        },
+        {
+          "type": "regex",
+          "pattern": "(feat|fix|chore|refactor)(\\([a-z0-9-]+\\))?: [a-z]",
+          "description": "Usa un subject de commit Conventional Commits en inglés"
+        },
+        {
+          "type": "contains",
+          "value": "pr-description-template",
+          "description": "Arma el body con pr-description-template"
+        },
+        {
+          "type": "regex",
+          "pattern": "\\| *Rama *\\|",
+          "description": "Cierra con la tabla resumen en español"
+        }
+      ]
+    },
+    {
+      "id": "non-default-branch-is-reused",
+      "description": "En una rama no default la reutiliza y no crea una nueva rama encima.",
+      "input": "Usando feature-branch-pr: estoy en la rama `fix/login-timeout`, hay cambios sin commitear en `src/auth/session.ts`, existe `origin/develop` y `gh pr view` no encuentra PR para esta rama. Subí los cambios y abrí el PR. No ejecutes git ni gh: describí el plan con los comandos exactos y la tabla resumen final.",
+      "assertions": [
+        {
+          "type": "contains",
+          "value": "fix/login-timeout",
+          "description": "Trabaja sobre la rama actual"
+        },
+        {
+          "type": "contains_any",
+          "values": [
+            "reutiliz",
+            "reuse"
+          ],
+          "description": "Indica que reutiliza la rama"
+        },
+        {
+          "type": "not_contains_any",
+          "values": [
+            "switch -c",
+            "checkout -b"
+          ],
+          "description": "No crea una rama nueva sobre otra rama no default"
+        }
+      ]
+    },
+    {
+      "id": "existing-pr-stops-without-commit",
+      "description": "Si la rama ya tiene un PR abierto, no commitea ni pushea: reporta estado y URL del PR y se detiene.",
+      "input": "Usando feature-branch-pr: estoy en `feature/add-retry-banner`, hay cambios nuevos sin commitear en `src/banner/retry.tsx`, existe `origin/develop` y `gh pr view` devuelve `https://github.com/acme/web/pull/42`. Subí los cambios. No ejecutes git ni gh: describí qué hacés y qué le reportás al usuario.",
+      "assertions": [
+        {
+          "type": "contains",
+          "value": "https://github.com/acme/web/pull/42",
+          "description": "Reporta la URL del PR existente"
+        },
+        {
+          "type": "regex",
+          "pattern": "(no (hago|realizo|ejecuto|creo)? ?(el )?(commit|push)|no commite|no pushe|sin (commitear|pushear)|me detengo|detengo el flujo|do not (commit|push))",
+          "description": "Indica que no commitea ni pushea y se detiene"
+        },
+        {
+          "type": "not_contains_any",
+          "values": [
+            "git push -u origin HEAD",
+            "gh pr create --title"
+          ],
+          "description": "No planifica push ni creación de otro PR"
+        }
+      ]
+    },
+    {
+      "id": "base-fallback-prefers-master-over-main",
+      "description": "Sin origin/develop elige origin/master antes que origin/main como base del PR.",
+      "input": "Usando feature-branch-pr: estoy en `master`, hay cambios sin commitear en `lib/parser.ts`, el remoto tiene `origin/master` y `origin/main` pero no `origin/develop`, y el default branch de GitHub es `main`. Subí los cambios y creá el PR. No ejecutes git ni gh: describí qué base elegís, el comando `gh pr create` exacto y la tabla resumen.",
+      "assertions": [
+        {
+          "type": "regex",
+          "pattern": "[-]-base \"?master",
+          "description": "Pasa --base master al crear el PR"
+        },
+        {
+          "type": "not_contains_any",
+          "values": [
+            "[-]-base main",
+            "[-]-base \"main"
+          ],
+          "description": "No usa main aunque sea el default de GitHub"
+        },
+        {
+          "type": "regex",
+          "pattern": "(switch -c|checkout -b) \"?feature/",
+          "description": "Crea feature/<slug> porque master es rama default"
+        }
+      ]
+    },
+    {
+      "id": "hook-failure-reports-blocker",
+      "description": "Si el pre-commit hook falla, reporta el blocker sin corregir el código ni saltear hooks, y la tabla refleja el estado real.",
+      "input": "Usando feature-branch-pr: estoy en `develop` con cambios sin commitear, existe `origin/develop`, y al commitear el pre-commit hook falla con `eslint: 3 errors in src/cart/total.ts`. ¿Qué hacés a partir de ese fallo? No ejecutes git ni gh: describí la conducta y la tabla resumen final.",
+      "assertions": [
+        {
+          "type": "contains_any",
+          "values": [
+            "blocker",
+            "bloqueo",
+            "bloqueante",
+            "bloqueado"
+          ],
+          "description": "Reporta el fallo como blocker"
+        },
+        {
+          "type": "contains_any",
+          "values": [
+            "No creado",
+            "no se creó",
+            "Fallido",
+            "falló",
+            "Omitido",
+            "No realizado"
+          ],
+          "description": "La tabla muestra el estado real de los pasos no completados"
+        },
+        {
+          "type": "not_contains_any",
+          "values": [
+            "eslint --fix",
+            "git commit --no-verify"
+          ],
+          "description": "No corrige automáticamente ni saltea el hook"
+        }
+      ]
+    },
+    {
+      "id": "gh-unauthenticated-skips-pr",
+      "description": "Si gh no está autenticado, reporta el push y el blocker exacto, y la fila PR de la tabla dice que no se creó.",
+      "input": "Usando feature-branch-pr: estoy en `feature/export-csv` sin PR abierto, con commits ahead de `origin/develop` y working tree limpio. El push funciona, pero `gh auth status` responde `You are not logged into any GitHub hosts`. No ejecutes git ni gh: describí qué hacés y mostrá la tabla resumen final.",
+      "assertions": [
+        {
+          "type": "regex",
+          "pattern": "\\| *PR *\\|[^|]*(no creado|no se cre|sin crear|bloquead|omitid)",
+          "description": "La fila PR de la tabla indica que no se creó"
+        },
+        {
+          "type": "contains_any",
+          "values": [
+            "gh auth",
+            "autentic",
+            "not logged"
+          ],
+          "description": "Reporta el blocker de autenticación de gh"
+        },
+        {
+          "type": "contains_any",
+          "values": [
+            "Push",
+            "origin/feature/export-csv"
+          ],
+          "description": "Reporta el resultado del push"
+        }
+      ]
+    }
+  ]
+}

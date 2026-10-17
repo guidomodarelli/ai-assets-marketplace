@@ -1,0 +1,199 @@
+{
+  "schema_version": 2,
+  "skill": "stacked-pr",
+  "description": "Evalúa la gestión de stacked PRs: división por responsabilidad con manifests y golden diff, creación de stacks desde un PR normal, agregado de capas al top, y ciclo de vida de backups scoped con cleanup transaccional, preservación ante fallos y estados BACKUPS_CLEANED, BACKUPS_PRESERVED_ON_FAILURE y BACKUP_CLEANUP_FAILED.",
+  "test_cases": [
+    {
+      "id": "split-large-pr-by-responsibility",
+      "description": "Divide un PR grande en capas feature/* encadenadas con backups scoped, manifests explícitos y comparación golden final, sin publicar sin autorización.",
+      "input": "Contexto: el PR #120 (head feature/checkout-redesign, base develop) es grande y mezcla contratos, backend, frontend, mocks, i18n y cleanup. Usando la skill stacked-pr, describí el plan paso a paso con los comandos que usarías, sin ejecutar nada: quiero dividirlo en stacked PRs por contracts/dependencies, backend, frontend, mocks/tests, i18n y cleanup, usando branches feature/* y validando que el último diff coincida con el head original.",
+      "assertions": [
+        {
+          "type": "contains_any",
+          "values": ["backup"],
+          "description": "Crea backups del head original antes de reescribir"
+        },
+        {
+          "type": "contains_any",
+          "values": ["manifest"],
+          "description": "Define manifests explícitos por capa"
+        },
+        {
+          "type": "contains",
+          "value": "feature/",
+          "description": "Usa branches feature/* encadenadas"
+        },
+        {
+          "type": "contains_any",
+          "values": ["golden"],
+          "description": "Usa el head original como golden"
+        },
+        {
+          "type": "contains_any",
+          "values": ["{tree}", "rev-parse", "árbol final", "final tree", "mismo árbol"],
+          "description": "Compara el árbol final del stack con el golden"
+        }
+      ]
+    },
+    {
+      "id": "normal-pr-to-stack",
+      "description": "Convierte un PR normal en la primera capa sin reescribirlo y encadena dos capas dependientes usando el head anterior como base.",
+      "input": "Contexto: tengo abierto el PR #88 (head feature/billing-api, base develop) en el mismo repositorio de GitHub. Usando la skill stacked-pr, describí el plan y los comandos sin ejecutar nada: quiero convertirlo en el primer PR de un stack y agregar dos capas dependientes sin cambiar el diff de la primera.",
+      "assertions": [
+        {
+          "type": "contains",
+          "value": "gh pr create",
+          "description": "Crea los PRs dependientes con gh pr create"
+        },
+        {
+          "type": "contains",
+          "value": "feature/billing-api",
+          "description": "Usa el head del PR existente como base de la primera capa nueva"
+        },
+        {
+          "type": "contains_any",
+          "values": ["mismo repositorio", "mismo repo", "same-repository", "same repository"],
+          "description": "Verifica que las branches estén en el mismo repositorio"
+        },
+        {
+          "type": "contains_any",
+          "values": ["gh pr checks", "CI", "checks"],
+          "description": "Reporta bases y CI"
+        },
+        {
+          "type": "regex",
+          "pattern": "(no|sin|nunca)[^.]{0,60}(reescrib|modific|cambi|toc)",
+          "description": "Conserva el PR existente sin reescribirlo"
+        }
+      ]
+    },
+    {
+      "id": "add-layer-to-existing-stack",
+      "description": "Lista PRs y relaciones base/head, identifica el top sin ciclos, crea feature/* desde el top y valida diff incremental y checks.",
+      "input": "Contexto: hay un stack abierto de tres PRs en el mismo repo: #201 (feature/search-contracts -> develop), #202 (feature/search-backend -> feature/search-contracts) y #203 (feature/search-frontend -> feature/search-backend). Usando la skill stacked-pr, describí el plan y los comandos sin ejecutar nada: necesito agregar otro PR para una nueva capa de tests y fixtures. Revisá la cadena, encontrá el top y abrí el nuevo PR con feature/*.",
+      "assertions": [
+        {
+          "type": "contains_any",
+          "values": ["gh pr list", "gh pr view"],
+          "description": "Inspecciona los PRs y sus relaciones base/head"
+        },
+        {
+          "type": "contains_any",
+          "values": ["ciclo", "cycle"],
+          "description": "Verifica que no haya ciclos"
+        },
+        {
+          "type": "contains",
+          "value": "feature/search-frontend",
+          "description": "Identifica feature/search-frontend como top layer y base del nuevo PR"
+        },
+        {
+          "type": "regex",
+          "pattern": "git switch -c feature/|git checkout -b feature/",
+          "description": "Crea una branch feature/* desde el top head"
+        },
+        {
+          "type": "contains_any",
+          "values": ["gh pr checks", "diff incremental", "incremental", "checks"],
+          "description": "Valida diff incremental y checks"
+        }
+      ]
+    },
+    {
+      "id": "cleanup-own-backups-after-success",
+      "description": "Tras éxito completo limpia solo los backups propios con transacción update-ref y OID esperado, conserva backup/legacy y reporta BACKUPS_CLEANED.",
+      "input": "Contexto: dividí un PR grande con stacked-pr. Todas las capas, pushes, checks CI y golden diff terminaron correctamente. Antes de empezar ya existía refs/heads/backup/legacy y esta ejecución creó refs nuevas bajo refs/heads/backup/stacked-pr/<run-id>/. Usando la skill stacked-pr, describí el cleanup con los comandos exactos sin ejecutar nada: limpiá al terminar sin borrar el backup anterior.",
+      "assertions": [
+        {
+          "type": "contains",
+          "value": "BACKUPS_CLEANED",
+          "description": "Reporta BACKUPS_CLEANED tras el éxito completo"
+        },
+        {
+          "type": "contains",
+          "value": "update-ref --stdin",
+          "description": "Usa git update-ref --stdin para el borrado"
+        },
+        {
+          "type": "contains_any",
+          "values": ["prepare"],
+          "description": "Usa una transacción con prepare y commit"
+        },
+        {
+          "type": "contains_any",
+          "values": ["OID esperado", "expected OID", "old-oid", "<old-oid>", "OID original"],
+          "description": "Exige el OID esperado en cada delete"
+        },
+        {
+          "type": "regex",
+          "pattern": "(conserv|preserv|mantien|intact|keep|no (se )?(borra|toca|elimina))[^.]{0,80}(backup/legacy|preexist)|backup/legacy[^.]{0,80}(conserv|preserv|intact|mantien|sin cambios)",
+          "description": "Conserva backup/legacy con su OID original"
+        }
+      ]
+    },
+    {
+      "id": "rebase-conflict-preserves-backups",
+      "description": "Ante un conflicto no resoluble detiene o aborta el rebase sin comandos destructivos, conserva backups y reporta BACKUPS_PRESERVED_ON_FAILURE sin declarar éxito.",
+      "input": "Contexto: estoy dividiendo un PR en un stack con stacked-pr y esta ejecución creó backups bajo refs/heads/backup/stacked-pr/<run-id>/. Durante el rebase de la capa feature/orders-frontend aparece un conflicto no resoluble con seguridad. Usando la skill stacked-pr, describí sin ejecutar nada qué hacés con backup/* y cómo cerrás el flujo.",
+      "assertions": [
+        {
+          "type": "contains",
+          "value": "BACKUPS_PRESERVED_ON_FAILURE",
+          "description": "Reporta BACKUPS_PRESERVED_ON_FAILURE con etapa y refs retenidas"
+        },
+        {
+          "type": "contains_any",
+          "values": ["rebase --abort", "abort", "detengo", "detiene", "detener", "stop"],
+          "description": "Detiene o aborta el rebase"
+        },
+        {
+          "type": "regex",
+          "pattern": "(no|nunca|sin|never)[^.]{0,80}(reset --hard|clean|skip|force)",
+          "description": "Declara que no usa reset --hard, clean, --skip ni force"
+        },
+        {
+          "type": "regex",
+          "pattern": "(no|nunca|sin|never)[^.]{0,60}(borr|elimin|limpi|cleanup|delete)",
+          "description": "No borra refs ni ejecuta cleanup como recuperación"
+        },
+        {
+          "type": "regex",
+          "pattern": "(no|sin|nunca|never)[^.]{0,60}(éxito|exitos|terminad|complet|success|golden)",
+          "description": "No reporta éxito ni golden final verificado"
+        }
+      ]
+    },
+    {
+      "id": "backup-oid-changed-aborts-cleanup",
+      "description": "Si el OID de una ref backup cambió antes del cleanup, aborta la transacción, reporta BACKUP_CLEANUP_FAILED y conserva las refs sin borrado parcial.",
+      "input": "Contexto: todas las validaciones y el golden diff de mi stack pasaron. Esta ejecución registró sus refs backup con su OID esperado, pero el OID de una de ellas cambió antes del cleanup. Usando la skill stacked-pr, describí sin ejecutar nada cómo intentás finalizar sin borrar refs ajenas ni hacer cleanup parcial, y qué reportás.",
+      "assertions": [
+        {
+          "type": "contains",
+          "value": "BACKUP_CLEANUP_FAILED",
+          "description": "Reporta BACKUP_CLEANUP_FAILED"
+        },
+        {
+          "type": "contains",
+          "value": "OID",
+          "description": "Usa el OID esperado como guard de cada delete"
+        },
+        {
+          "type": "contains_any",
+          "values": ["transacc", "transaction", "atómic", "atomic", "update-ref --stdin"],
+          "description": "Evita borrado parcial mediante transacción atómica"
+        },
+        {
+          "type": "regex",
+          "pattern": "(conserv|preserv|retien|retenid|mantien|keep|retain)",
+          "description": "Conserva las refs restantes y las preexistentes"
+        },
+        {
+          "type": "not_contains_any",
+          "values": ["git branch -D backup", "update-ref -d refs/heads/backup/"],
+          "description": "No borra refs por wildcard ni con branch -D"
+        }
+      ]
+    }
+  ]
+}
