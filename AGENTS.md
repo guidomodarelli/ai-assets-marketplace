@@ -185,27 +185,27 @@ export AI_ASSETS_MARKETPLACE_EVAL_PROVIDER=codex
 
 ## Bumping a plugin version
 
-`npm run cv` is a short alias of `npm run create-version` and accepts the same arguments.
+`bun run cv` is a short alias of `bun run create-version` and accepts the same arguments.
 
 ```bash
 # Interactive: pick a plugin from a numbered menu
-npm run create-version
+bun run create-version
 
 # Target a plugin directly by name
-npm run create-version <plugin-name>
+bun run create-version <plugin-name>
 
 # Preview without writing, committing or pushing (shorthand: -n)
-npm run create-version -- --dry-run
+bun run create-version -- --dry-run
 
 # Skip the version prompt
-npm run create-version -- <plugin-name> --bump minor
-npm run create-version -- --set 2.0.0
+bun run create-version -- <plugin-name> --bump minor
+bun run create-version -- --set 2.0.0
 
 # Show usage (shorthand: -h)
-npm run create-version -- --help
+bun run create-version -- --help
 ```
 
-Updates the `version` field in **both** provider manifests (`.claude-plugin/plugin.json` and `.codex-plugin/plugin.json`) so they stay in sync. Detects changed plugin paths under `plugins/` from the current branch diff against the first available remote base (`origin/develop`, `origin/master`, or `origin/main`) plus working-tree changes and any commit made under a plugin after the last commit that changed its version (so a plugin merged into the default branch without a bump is still detected there), and auto-selects the plugin when exactly one changed, even when other files outside `plugins/` are modified. When the repository has a single plugin, it is selected without showing the menu. Changed plugins whose manifest version already differs from the merge-base with that remote base (bumped in branch commits or in the working tree) are reported as already bumped, excluded from auto-selection, and marked as `✔ bumped` in the menu, so with several changed plugins the one still pending is auto-selected. Offers a semver bump (`patch`/`minor`/`major`) or a custom exact version, and aborts if the two manifests are not already on the same version. After the version is selected, commits **only** the two updated `plugin.json` manifests with a descriptive message (other staged, unstaged or untracked changes are left untouched), then pushes the branch automatically (`git push -u origin HEAD` when no upstream exists). It never force-pushes and skips the push on default branches (`develop`, `master`, `main`); if the push fails, the local commit is kept and the script exits with an error. `--dry-run` (`-n`) runs the same prompts and prints the planned manifest updates, commit and push without changing anything. `--bump <patch|minor|major>` or `--set <version>` (mutually exclusive) skip the version prompt; `--help` (`-h`) prints usage. Implemented in `scripts/create-version.js` (zero external deps).
+Updates the `version` field in **both** provider manifests (`.claude-plugin/plugin.json` and `.codex-plugin/plugin.json`) so they stay in sync. Detects changed plugin paths under `plugins/` from the current branch diff against the first available remote base (`origin/develop`, `origin/master`, or `origin/main`) plus working-tree changes and any commit made under a plugin after the last commit that changed its version (so a plugin merged into the default branch without a bump is still detected there), and auto-selects the plugin when exactly one changed, even when other files outside `plugins/` are modified. When the repository has a single plugin, it is selected without showing the menu. Changed plugins whose manifest version already differs from the merge-base with that remote base (bumped in branch commits or in the working tree) are reported as already bumped, excluded from auto-selection, and marked as `✔ bumped` in the menu, so with several changed plugins the one still pending is auto-selected. Offers a semver bump (`patch`/`minor`/`major`) or a custom exact version, and aborts if the two manifests are not already on the same version. After the version is selected, commits **only** the two updated `plugin.json` manifests with a descriptive message (other staged, unstaged or untracked changes are left untouched), then pushes the branch automatically (`git push -u origin HEAD` when no upstream exists). It never force-pushes and also pushes default branches (`develop`, `master`, `main`); if the push fails, the local commit is kept and the script exits with an error. `--dry-run` (`-n`) runs the same prompts and prints the planned manifest updates, commit and push without changing anything. `--bump <patch|minor|major>` or `--set <version>` (mutually exclusive) skip the version prompt; `--help` (`-h`) prints usage. Implemented in `scripts/create-version.js` (zero external deps).
 
 ## Single source of truth
 

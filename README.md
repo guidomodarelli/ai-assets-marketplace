@@ -220,18 +220,18 @@ el repositorio no cambia.
 
 ## 🔖 Bumping de versión de un plugin
 
-Usá el script `create-version` para hacer bump a la versión de un plugin. Actualiza el campo `version` en **ambos** manifiestos de proveedor (`.claude-plugin/plugin.json` y `.codex-plugin/plugin.json`) a la vez, manteniéndolos sincronizados. `npm run cv` es un alias corto con los mismos argumentos (`npm run cv -- --dry-run`).
+Usá el script `create-version` para hacer bump a la versión de un plugin. Actualiza el campo `version` en **ambos** manifiestos de proveedor (`.claude-plugin/plugin.json` y `.codex-plugin/plugin.json`) a la vez, manteniéndolos sincronizados. `bun run cv` es un alias corto con los mismos argumentos (`bun run cv --dry-run`).
 
 ```bash
-npm run create-version              # auto-detecta el único plugin cambiado sin bump en la branch; si no, muestra menú
-npm run create-version ai-assets-kit    # apuntá a un plugin directamente por nombre
-npm run create-version -- --dry-run  # preview sin escribir, commitear ni pushear (shorthand: -n)
-npm run create-version -- ai-assets-kit --bump minor  # sin prompts (patch | minor | major)
-npm run create-version -- --set 2.0.0  # versión exacta sin prompts
-npm run create-version -- --help     # ayuda (shorthand: -h)
+bun run create-version              # auto-detecta el único plugin cambiado sin bump en la branch; si no, muestra menú
+bun run create-version ai-assets-kit    # apuntá a un plugin directamente por nombre
+bun run create-version -- --dry-run  # preview sin escribir, commitear ni pushear (shorthand: -n)
+bun run create-version -- ai-assets-kit --bump minor  # sin prompts (patch | minor | major)
+bun run create-version -- --set 2.0.0  # versión exacta sin prompts
+bun run create-version -- --help     # ayuda (shorthand: -h)
 ```
 
-El script compara branch actual contra primera base remota disponible (`origin/develop`, `origin/master` u `origin/main`) y suma cambios locales y los commits hechos en cada plugin después del último cambio de su versión (así detecta un plugin mergeado a la rama default sin bump) para detectar qué plugin cambió. Si el repo tiene un solo plugin, lo selecciona sin mostrar el menú. Ignora archivos fuera de `plugins/` para esa decisión. Luego pregunta cómo establecer la nueva versión — un semver bump (`patch` / `minor` / `major`) calculado desde la versión actual, o una versión exacta personalizada — crea un commit que incluye **solo** los dos `plugin.json` actualizados (el resto de cambios staged, unstaged o untracked queda intacto) y hace `push` automático de la rama (con `-u origin HEAD` si todavía no tiene upstream). Nunca hace force-push y omite el push en ramas default (`develop`, `master`, `main`); si el push falla, el commit local se conserva y el script termina con error. Con `--dry-run` (o `-n`) recorre los mismos prompts y muestra qué archivos actualizaría, el commit y el push planeados, sin modificar nada. `--bump <kind>` o `--set <version>` evitan el prompt de versión (no se pueden combinar) y `--help` (`-h`) muestra el uso.
+El script compara branch actual contra primera base remota disponible (`origin/develop`, `origin/master` u `origin/main`) y suma cambios locales y los commits hechos en cada plugin después del último cambio de su versión (así detecta un plugin mergeado a la rama default sin bump) para detectar qué plugin cambió. Si el repo tiene un solo plugin, lo selecciona sin mostrar el menú. Ignora archivos fuera de `plugins/` para esa decisión. Luego pregunta cómo establecer la nueva versión — un semver bump (`patch` / `minor` / `major`) calculado desde la versión actual, o una versión exacta personalizada — crea un commit que incluye **solo** los dos `plugin.json` actualizados (el resto de cambios staged, unstaged o untracked queda intacto) y hace `push` automático de la rama (con `-u origin HEAD` si todavía no tiene upstream). Nunca hace force-push y también pushea las ramas default (`develop`, `master`, `main`); si el push falla, el commit local se conserva y el script termina con error. Con `--dry-run` (o `-n`) recorre los mismos prompts y muestra qué archivos actualizaría, el commit y el push planeados, sin modificar nada. `--bump <kind>` o `--set <version>` evitan el prompt de versión (no se pueden combinar) y `--help` (`-h`) muestra el uso.
 
 > ⚠️ Antes de escribir, valida que ambos manifiestos ya compartan la misma versión y aborta si difieren — nunca vas a hacer bump desde un estado inconsistente.
 
@@ -239,20 +239,20 @@ El script compara branch actual contra primera base remota disponible (`origin/d
 
 ## 🧪 Correr tests shell localmente
 
-Las suites shell usan [bats-core](https://github.com/bats-core/bats-core) con versión y dependencias fijadas en `package-lock.json`.
+Las suites shell usan [bats-core](https://github.com/bats-core/bats-core) con versión y dependencias fijadas en `bun.lock`. Requieren [Bun](https://bun.sh) 1.4+.
 
 ```bash
 # Instalación reproducible
-npm ci
+bun install --frozen-lockfile
 
 # Preparación explícita de tests browser (Python 3.11+, instala tomlkit en venv local)
-npm run setup:browser-tests
+bun run setup:browser-tests
 
 # Suites aisladas: Agent Ready, create-version y contrato del eval runner
-npm test
+bun run test
 ```
 
-`npm run test:browser` ejecuta pruebas de registro browser desde el venv local,
+`bun run test:browser` ejecuta pruebas de registro browser desde el venv local,
 sin descargar dependencias. La prueba de lanzamiento real es opt-in mediante
 `AGENT_READY_SETUP_BROWSER_SMOKE_ROOT` (directorio administrado de herramientas)
 y `AGENT_READY_SETUP_BROWSER_SMOKE_EXECUTABLE` (path de Chromium instalado).

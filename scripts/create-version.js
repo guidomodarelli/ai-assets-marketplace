@@ -10,11 +10,11 @@
  * them in sync, then commits only those two manifests and pushes the branch.
  *
  * Usage:
- *   npm run create-version            -> interactive plugin menu
- *   npm run create-version <plugin>   -> target a plugin directly by name
- *   npm run create-version -- --dry-run | -n   -> preview without writing, committing or pushing
- *   npm run create-version -- --bump <kind> | --set <version>   -> skip the version prompt
- *   npm run create-version -- --help | -h   -> show usage
+ *   bun run create-version            -> interactive plugin menu
+ *   bun run create-version <plugin>   -> target a plugin directly by name
+ *   bun run create-version -- --dry-run | -n   -> preview without writing, committing or pushing
+ *   bun run create-version -- --bump <kind> | --set <version>   -> skip the version prompt
+ *   bun run create-version -- --help | -h   -> show usage
  */
 
 const childProcess = require('child_process');
@@ -472,17 +472,12 @@ function hasUpstreamBranch() {
 }
 
 /**
- * Plans the push for the current branch, setting upstream on first push. Default branches
- * get no push arguments so bumps always travel through a pull request.
+ * Plans the push for the current branch, including default branches, setting upstream on first push.
  *
- * @returns {{ branchName: string, pushArguments: string[] | null }} Push plan.
+ * @returns {{ branchName: string, pushArguments: string[] }} Push plan.
  */
 function planPush() {
   const branchName = runGit(['rev-parse', '--abbrev-ref', 'HEAD']).trim();
-
-  if (DEFAULT_BRANCHES.includes(branchName)) {
-    return { branchName, pushArguments: null };
-  }
 
   return {
     branchName,
@@ -602,14 +597,14 @@ function renderHelp() {
   const flag = (text) => paint('magenta', paint('bold', text.padEnd(24)));
   const section = (text) => paint('bold', text);
   const examples = [
-    ['npm run create-version', 'interactive'],
-    [`npm run create-version -- ai-assets-kit ${BUMP_FLAG} minor`, 'no prompts'],
-    [`npm run create-version -- -n ${SET_FLAG} 2.0.0`, 'preview exact version'],
+    ['bun run create-version', 'interactive'],
+    [`bun run create-version -- ai-assets-kit ${BUMP_FLAG} minor`, 'no prompts'],
+    [`bun run create-version -- -n ${SET_FLAG} 2.0.0`, 'preview exact version'],
   ];
   const exampleColumnWidth = Math.max(...examples.map(([exampleCommand]) => exampleCommand.length));
   return renderPanel('🌱 create-version · help', [
     section('Usage'),
-    `  ${command('npm run create-version -- [plugin] [options]')}`,
+    `  ${command('bun run create-version -- [plugin] [options]')}`,
     '',
     section('Options'),
     `  ${flag('-n, --dry-run')}Preview without writing, committing or pushing`,
@@ -890,10 +885,9 @@ async function main() {
 
     if (isDryRun) {
       const pushPlan = planPush();
-      const pushLine = pushPlan.pushArguments
-        ? `🚀 Would push "${paint('cyan', pushPlan.branchName)}" to ${REMOTE_NAME} ` +
-          paint('gray', `(git ${pushPlan.pushArguments.join(' ')})`)
-        : `⚠️  Would skip push: "${pushPlan.branchName}" is a default branch.`;
+      const pushLine =
+        `🚀 Would push "${paint('cyan', pushPlan.branchName)}" to ${REMOTE_NAME} ` +
+        paint('gray', `(git ${pushPlan.pushArguments.join(' ')})`);
 
       console.log(
         `\n${renderPanel(
@@ -931,15 +925,8 @@ async function main() {
     );
 
     const pushPlan = planPush();
-    if (pushPlan.pushArguments) {
-      pushVersionBump(pushPlan);
-      console.log(`\n🚀 Pushed "${paint('cyan', pushPlan.branchName)}" to ${REMOTE_NAME}\n`);
-    } else {
-      console.log(
-        `\n${paint('yellow', `⚠️  Skipped push: "${pushPlan.branchName}" is a default branch.`)} ` +
-          'Push from a feature branch.\n'
-      );
-    }
+    pushVersionBump(pushPlan);
+    console.log(`\n🚀 Pushed "${paint('cyan', pushPlan.branchName)}" to ${REMOTE_NAME}\n`);
   } finally {
     rl.close();
   }
