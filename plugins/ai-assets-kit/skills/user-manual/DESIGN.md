@@ -592,7 +592,7 @@ una variable CSS por token, con el mismo nombre (`label` → `--label`) y el
 mismo valor. Después de tocar un color en cualquiera de los dos lados, correr:
 
 ```bash
-bash scripts/design/check-design-tokens.sh
+bash scripts/check-design-tokens.sh   # desde la carpeta de la skill user-manual
 ```
 
 Falla (exit `1`) si falta una variable, sobra una o un valor no coincide.
@@ -1532,7 +1532,7 @@ viejos siguen funcionando: los nombres de clase no cambiaron.
 - **Spacing:** la escala suma 10, 32 y 56px y se renombra en orden; los paddings fuera de escala se ajustan (callouts `12px 16px`, example box `16px 20px`, accordion `12px 16px`, code inline `1px 6px`, indentación de listas `24px`).
 - **Componentes nuevos:** índice (TOC), estilos de link, `mockup-body` y `.table-wrap`.
 - **Boilerplate:** HTML semántico (`<h1>`, `<h2>`, `<section>`, `<ol>`), variables CSS con el mismo nombre que los tokens, CSS de todos los componentes, foco visible, breakpoint mobile e impresión.
-- **Tooling:** `scripts/design/check-design-tokens.sh` verifica que front matter y `:root` no se desalineen.
+- **Tooling:** `scripts/check-design-tokens.sh` (en la skill user-manual) verifica que front matter y `:root` no se desalineen.
 
 ### 2026-06-26
 
