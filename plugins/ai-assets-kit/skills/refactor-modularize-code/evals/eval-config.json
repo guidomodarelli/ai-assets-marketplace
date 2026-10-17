@@ -1,0 +1,88 @@
+{
+  "schema_version": 2,
+  "skill": "refactor-modularize-code",
+  "description": "Evalúa refactors de modularidad y cohesión: fases acordadas con métricas y orden de extracción, deduplicación sin helpers genéricos con flags, y separación de una cola React con estado local y coordinación de foco explícita.",
+  "test_cases": [
+    {
+      "id": "large-module-phased-extraction-order",
+      "description": "Ante un archivo de 850 líneas, mide métricas, acuerda fases, respeta el orden tipos/constantes/helpers/componentes y valida cada fase sin cambiar contratos públicos.",
+      "input": "Usando refactor-modularize-code: tengo `src/features/shipments/ShipmentsPanel.tsx`, un archivo TypeScript de 850 líneas que mezcla tipos de dominio, mapping de la respuesta de la API a modelos locales, validación de formularios, requests con `fetch` y el render de React. Otros módulos importan `ShipmentStatus` y `mapShipmentResponse` desde ese archivo. Modularizalo sin cambiar contratos públicos. No ejecutes ni edites nada: describí el plan paso a paso.",
+      "assertions": [
+        {
+          "type": "contains_any",
+          "values": ["fase", "phase", "etapa"],
+          "description": "Divide el refactor en fases"
+        },
+        {
+          "type": "contains_any",
+          "values": ["acord", "confirm", "aprob", "agree", "antes de editar", "antes de extraer"],
+          "description": "Acuerda las fases con el usuario antes de extraer"
+        },
+        {
+          "type": "regex",
+          "pattern": "(total|feature).*(líneas|lineas|lines)|(líneas|lineas|lines).*(total|feature)",
+          "description": "Mide líneas del archivo principal y del total del feature"
+        },
+        {
+          "type": "contains_any",
+          "values": ["reexport", "re-export", "contrato", "contract", "API pública", "API publica", "public API"],
+          "description": "Preserva los contratos públicos de los importers existentes"
+        },
+        {
+          "type": "contains_any",
+          "values": ["typecheck", "tsc", "type-check", "lint"],
+          "description": "Valida typecheck o lint en cada fase"
+        }
+      ]
+    },
+    {
+      "id": "dedupe-filters-without-flag-helper",
+      "description": "Reduce la duplicación de filtrado extrayendo solo lo realmente común y sin un helper genérico con flags específicos de caller.",
+      "input": "Usando refactor-modularize-code: dos componentes repiten el filtrado de operadores, pero uno busca por usuario LDAP y por nombre, y el otro solo por nombre.\n\n```tsx\n// OperatorPicker.tsx\nconst visibleOperators = operators.filter((operator) => {\n  const query = searchTerm.trim().toLowerCase();\n  return operator.name.toLowerCase().includes(query) || operator.ldapUser.toLowerCase().includes(query);\n});\n\n// OperatorDirectory.tsx\nconst visibleOperators = operators.filter((operator) => {\n  const query = searchTerm.trim().toLowerCase();\n  return operator.name.toLowerCase().includes(query);\n});\n```\n\nReducí la duplicación sin crear un helper genérico con flags ambiguos. No ejecutes ni edites nada: describí qué extraerías, dónde lo ubicarías y por qué.",
+      "assertions": [
+        {
+          "type": "contains_any",
+          "values": ["común", "comun", "common", "compartid", "shared"],
+          "description": "Identifica la parte realmente común entre ambos filtros"
+        },
+        {
+          "type": "contains_any",
+          "values": ["flag", "bandera", "booleano", "boolean", "rama", "branch"],
+          "description": "Explica por qué evita flags o ramas específicas de caller"
+        },
+        {
+          "type": "contains_any",
+          "values": ["normaliz", "predicad", "predicate", "matcher", "matches", "componer", "compose"],
+          "description": "Propone una extracción acotada como normalización o predicado componible"
+        }
+      ]
+    },
+    {
+      "id": "queue-split-local-state-focus-callback",
+      "description": "Separa una cola React con estado local en el hijo, coordina el foco con un callback explícito, cubre el flujo observable con tests y reporta métricas de archivo principal y feature.",
+      "input": "Usando refactor-modularize-code: `src/features/picking/PickingScreen.tsx` contiene una cola React con búsqueda, foco del input de búsqueda, paginación y acciones por fila. El padre controla el scanner y necesita saber cuándo la búsqueda tiene foco para deshabilitarlo:\n\n```tsx\nconst [searchTerm, setSearchTerm] = useState('');\nconst [isSearchFocused, setIsSearchFocused] = useState(false);\nconst [page, setPage] = useState(1);\nuseScanner({ enabled: !isSearchFocused, onScan: handleScan });\n// ...filtrado, paginación, render de filas con botones Asignar y Quitar...\n```\n\nSeparala en un componente `PickingQueue`. No ejecutes ni edites nada: describí el plan, el contrato de props, cómo lo validarías y qué métricas reportarías.",
+      "assertions": [
+        {
+          "type": "contains_any",
+          "values": ["onSearchFocusChange", "onFocusChange", "onSearchFocus", "callback"],
+          "description": "Coordina el foco entre padre e hijo con un callback explícito"
+        },
+        {
+          "type": "regex",
+          "pattern": "(estado|state).*(local|PickingQueue|cola|queue|hijo|child)|(local|PickingQueue|cola|queue|hijo|child).*(estado|state)",
+          "description": "Deja el estado de búsqueda y paginación local en la cola"
+        },
+        {
+          "type": "contains_any",
+          "values": ["test", "prueba"],
+          "description": "Cubre el flujo observable con tests"
+        },
+        {
+          "type": "regex",
+          "pattern": "(total|feature).*(líneas|lineas|lines)|(líneas|lineas|lines).*(total|feature)",
+          "description": "Reporta métricas del archivo principal y del total del feature"
+        }
+      ]
+    }
+  ]
+}

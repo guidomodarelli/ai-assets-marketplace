@@ -7,6 +7,8 @@ metadata:
 
 # Constants Refactor
 
+<!-- Paridad: variante de la skill `constants-refactor` del plugin ai-assets-kit adaptada a las rules de este stack. Al cambiar el workflow general (modos, métrica, paridad, tipos), actualizar ambas. -->
+
 ## Objetivo
 
 Dar una fuente canónica en `constants/` a cada constante estática con significado de dominio o de contrato, aunque exista un solo consumidor actual: la cantidad de usos no decide la ubicación. Aplicar además las rules del proyecto, que prevalecen sobre esta skill:
@@ -19,15 +21,32 @@ No confundir constantes con variables calculadas en runtime, estado mutable o re
 
 Aplicar workflow completo cuando usuario pida implementar. Entregar solo análisis cuando usuario pida review o informe sin cambios.
 
+## Modos
+
+Elegir el modo antes de inventariar; el alcance y la base de comparación dependen de él.
+
+| Modo | Cuándo | Alcance | Base |
+|---|---|---|---|
+| **PR / diff** | Revisar o ajustar un PR, una rama o cambios locales | Archivos del diff y sus consumers directos | `git diff BASE...HEAD` separado de cambios no commiteados |
+| **Auditoría de repo** | Revisar o refactorizar el repositorio completo | Todo el código de producción y el tooling versionado | Estado actual de la rama; no requiere diff |
+
+En ambos modos, aplicar al alcance esta regla por tipo de código:
+
+- **Producción** (lo que se publica, despliega o ejecuta en runtime): aplicar la skill completa.
+- **Tooling** (`scripts/`, `benchmarks/`, build, release): misma regla, con su propio `constants/` junto al tooling (por ejemplo `scripts/constants/`); no importar constantes de tooling desde producción ni al revés salvo contrato compartido real.
+- **Tests**: los inputs y fixtures que representan datos de prueba se quedan en el test. Los valores esperados de un contrato público u observable (msgids, códigos de error, rutas publicadas) se escriben como literales en el test: son el oráculo y deben fallar si la constante cambia por accidente. Los valores internos que el test solo usa como configuración o setup (límites, timeouts) se importan desde `constants/`.
+- **Código generado** (catálogos, clientes generados, `dist/`): no tocar.
+
 ## Quick start
 
-1. Resolver repositorio, lenguaje/framework, rama base y alcance exacto.
-2. Separar `git diff BASE...HEAD` de cambios no commiteados.
-3. Inventariar declaraciones `const`, atoms escalares `as const`, objetos/arrays `as const`, enums/union literals, regex, límites, códigos, paths, timeouts y strings repetidos.
-4. Comparar inventario con `constants/`, `config/`, `permissions/`, `utils/`, tipos/interfaces, schemas y módulos de dominio existentes.
-5. Clasificar cada candidato: `mover a constants/`, `mantener como variable runtime` o `no tocar`.
-6. Implementar fuentes canónicas, migrar consumers y tests.
-7. Ejecutar validaciones y reportar bloqueos reales sin ocultarlos.
+1. Resolver repositorio, lenguaje/framework, modo y alcance exacto.
+2. Modo PR: separar `git diff BASE...HEAD` de cambios no commiteados. Modo auditoría: listar archivos de producción y tooling versionados.
+3. Medir línea base (ver «Métrica objetiva»).
+4. Inventariar declaraciones `const`, atoms escalares `as const`, objetos/arrays `as const`, enums/union literals, regex, límites, códigos, paths, timeouts y strings repetidos.
+5. Comparar inventario con `constants/`, `config/`, `permissions/`, `utils/`, tipos/interfaces, schemas y módulos de dominio existentes.
+6. Clasificar cada candidato: `mover a constants/`, `mantener como variable runtime` o `no tocar` (trivial, vocabulario estándar, copy).
+7. Implementar fuentes canónicas, migrar consumers y tests.
+8. Ejecutar validaciones, repetir la métrica y reportar bloqueos reales sin ocultarlos.
 
 ## Organización física por dominio
 
@@ -76,8 +95,8 @@ Antes de migrar consumers, recorrer destino y todos sus barrels ascendentes. Si 
 - Cuando un literal tenga significado de dominio unitario y estable, definirlo una sola vez como atom escalar en `constants/`, aunque hoy tenga un solo consumidor: `const SEMANTIC_ATOM = 'value' as const`.
 - Construir arrays y agregados contractuales desde atoms: `const CONTRACT_VALUES = [SEMANTIC_ATOM, OTHER_ATOM] as const`.
 - Nombrar atoms por rol semántico y dominio (`LABOUR_SHARE_SOURCE_SCANNER`), no por valor genérico (`VALUE`, `ITEM`, `TYPE`).
-- Derivar unions desde el array contractual correspondiente, no desde un array de otro dominio. Mantener arrays distintos cuando tengan semánticas distintas aunque compartan atoms (`mixed` no pertenece a una lista de valores individuales).
-- Compartir atom después de comprobar equivalencia de significado, boundary, serialización y consumers. La coincidencia textual aislada no justifica reutilizar un atom existente, pero tampoco justifica mantenerlo en el consumidor.
+- Mantener arrays distintos cuando tengan semánticas distintas aunque compartan atoms (`mixed` no pertenece a una lista de valores individuales).
+- Compartir atom después de comprobar equivalencia de significado, boundary, serialización y consumers. La coincidencia textual aislada no justifica reutilizar un atom existente, pero tampoco justifica mantenerlo en el consumidor. Dos conceptos distintos con el mismo valor (por ejemplo dos severidades por defecto que hoy valen `"warn"`) quedan como constantes separadas.
 - Mantener atoms puros, sin servicios, permisos, imports server-only ni side effects; los valores estáticos se declaran en `constants/` y no se calculan al importar.
 - Preservar orden, identidad y forma observable. No reemplazar referencias canónicas por `Array.from`, spread, `Object.freeze` o composición dinámica cuando eso cambie identidad, mutabilidad o serialización requerida por consumers.
 - No atomizar variables calculadas, estado mutable, resultados de llamadas ni datos derivados de input. Mover declaraciones constantes estáticas completas —incluidos fixtures y mapas contractuales— aunque tengan un solo consumidor; no fragmentarlas solo por estética.
@@ -147,7 +166,8 @@ La decisión de mover depende del significado del valor, no de la cantidad de re
 Dejar fuera:
 
 - variables calculadas en runtime, estado mutable, resultados de llamadas, respuestas, datos derivados de input y expresiones cuyo valor cambie durante la ejecución, porque no son constantes;
-- literales triviales sin significado propio (`0`, `1`, `-1`, `true`, `false`, string vacío de inicialización);
+- literales triviales sin significado propio (`0`, `1`, `-1`, `true`, `false`, string vacío de inicialización) y literales mecánicos cuyo nombre sería más ruidoso que el valor (separador `"/"`, un espacio, un salto de línea usado como join);
+- vocabulario estándar del lenguaje o la plataforma, autoexplicativo y definido fuera del proyecto: resultados de `typeof`, métodos HTTP en la definición de una ruta, encodings (`"utf8"`), nombres de eventos del DOM. Si una dependencia de runtime exporta el valor como constante, usar esa fuente;
 - declaraciones route-local necesarias para montar un subrouter o definir su schema (`frontend-style.md` › `Module placement`); los límites y valores de dominio que ese schema usa sí van a `constants/`.
 
 Si un valor con significado de dominio puede declararse y permanecer fijo durante la ejecución, tratarlo como constante y moverlo a `constants/`.
@@ -159,7 +179,7 @@ Si un valor con significado de dominio puede declararse y permanecer fijo durant
 - valores por entorno/deployment, base URLs y scopes → `config/` vía el módulo de configuración del proyecto, no `constants`;
 - rutas backend-for-frontend compartidas → `constants/routes.ts` o equivalente;
 - paths upstream privados → cliente/adapter;
-- copy, labels y msgids user-facing → catálogo i18n del proyecto, no `constants/`;
+- copy, labels y msgids user-facing → catálogo i18n del proyecto, no `constants/` (con `gettext` el msgid es el propio texto fuente). Si el proyecto usa i18n basado en claves, las claves sí van a `constants/` y el texto queda en el catálogo;
 - estados internos de un parser sin significado de dominio → módulo del parser; si una regex o estado forma parte de un contrato, va a `constants/`.
 
 ## Diseño seguro
@@ -194,12 +214,14 @@ Al componer arrays desde atoms, preservar orden, referencia e identidad cuando f
 
 ### Ciclos y tipos
 
-- Usar objetos `as const` y unions derivados.
+- Usar objetos o arrays `as const` para los valores y declarar el tipo como union literal explícita y legible. No derivar tipos desde constantes con `typeof X[number]`, `(typeof X)[keyof typeof X]` ni variantes.
+- Verificar la sincronía desde la constante con `satisfies` contra el tipo explícito (`[A, B] as const satisfies readonly MyUnion[]`, `{ ... } satisfies Record<MyUnion, string>`): un drift falla en typecheck.
+- Cuando `.includes()` o `.has()` reciben un valor más amplio que la union, anotar la colección como `readonly string[]`/`ReadonlySet<string>` en vez de castear en cada consumer.
 - No usar `enum` (`frontend-style.md` › `TypeScript`).
 - Mantener imports type-only desde `interfaces/` o `types/` cuando corresponda.
 - Evitar que `constants/` importe valores desde módulos de tipos si esos módulos deben depender de `constants/`.
 - Preferir dirección unidireccional: `atoms/constants → tipos/consumers` o imports type-only sin ciclo runtime.
-- Derivar tipos desde atoms/agregados del mismo dominio; no importar valores runtime desde `interfaces/` o `types/` hacia `constants/`.
+- Ubicar el tipo en el módulo de tipos del dominio; `constants/` lo importa solo como type-only. No importar valores runtime desde `interfaces/` o `types/` hacia `constants/`.
 - Verificar reglas de ciclo, resolución de imports y aliases configurados por el repositorio.
 
 ### Naming y comentarios
@@ -211,12 +233,13 @@ Al componer arrays desde atoms, preservar orden, referencia e identidad cuando f
 
 1. Crear o ampliar archivo de dominio cohesivo en `constants/`.
 2. Identificar los valores estáticos con significado de dominio y definirlos allí; crear atoms antes de arrays/agregados contractuales cuando corresponda, aunque cada atom tenga un solo consumidor.
-3. Construir arrays/agregados y tipos derivados desde atoms, conservando contratos separados.
+3. Construir arrays/agregados desde atoms, verificarlos con `satisfies` contra tipos explícitos y conservar contratos separados.
 4. Mantener nombre semántico; no usar nombres genéricos como `VALUE`, `LIMIT`, `DATA`.
 5. Mover valores sin cambiar strings, orden, default, serialización o respuesta.
-6. Actualizar barrels, imports de producción, tests y fixtures constantes.
-7. Revisar diff por dominio excluido antes de continuar.
-8. No mezclar refactor de constantes con cambios funcionales no solicitados.
+6. Respetar el orden de declaración: una constante usada por otra del mismo módulo se declara antes (evitar TDZ).
+7. Actualizar barrels, imports de producción, tests y fixtures constantes.
+8. Revisar diff por dominio excluido antes de continuar.
+9. No mezclar refactor de constantes con cambios funcionales no solicitados.
 
 ## Verificación
 
@@ -241,6 +264,18 @@ rg -n "@constants" .
 rg -n "from ['\"].*/(interfaces|types).*(ERROR_CODES|STATUS|FACILITY|REASON)" src api app lib utils
 ```
 
+### Métrica objetiva
+
+Medir antes y después con una herramienta automática en vez de estimar:
+
+- Si el proyecto tiene un linter de literales mágicos o duplicados (reglas `no-magic-*`, `no-duplicate-string` o equivalentes), correrlo sobre el alcance antes de cambiar y al terminar; reportar el conteo y cada hallazgo remanente con su justificación.
+- Si no existe, usar un conteo reproducible con `rg` sobre literales en comparaciones, `switch`/`case` y argumentos de llamadas, y documentar el comando.
+- Un hallazgo remanente es aceptable solo si cae en «Mantener fuera de `constants/`» o es un falso positivo explicado (por ejemplo, dos conceptos con el mismo valor).
+
+### Paridad de comportamiento
+
+Cuando el refactor cambia la forma de la lógica y no solo referencias (condiciones anidadas → tabla de rangos, objetos literales → objeto compartido), escribir o identificar un test que cubra ese comportamiento y ejecutarlo también contra el código original (por ejemplo con `git stash` del código de producción). Si pasa en ambos, la paridad está demostrada; si no hay cobertura previa, agregar el test.
+
 No marcar tarea como completa si tests, lint o build fallan. Si falla por cambio preexistente, aislarlo, documentar archivo/línea y no modificarlo sin autorización.
 
 ## Formato de salida
@@ -249,13 +284,16 @@ Usar este formato salvo que usuario pida otro:
 
 ```markdown
 ## Alcance
-- Base, HEAD, archivos y cambios locales excluidos.
+- Modo, base/HEAD o rama, archivos y cambios locales excluidos.
+
+## Métrica
+| Momento | Hallazgos | Herramienta |
 
 ## Candidatos movidos
 | Archivo/línea | Valor | Destino | Motivo |
 
 ## Valores fuera de `constants/`
-| Archivo/línea | Valor | Motivo (no es constante, trivial, route-local, secreto, config o i18n) |
+| Archivo/línea | Valor | Motivo (no es constante, trivial, vocabulario estándar, route-local, secreto, config o i18n) |
 
 ## Cambios aplicados
 - Fuentes canónicas.

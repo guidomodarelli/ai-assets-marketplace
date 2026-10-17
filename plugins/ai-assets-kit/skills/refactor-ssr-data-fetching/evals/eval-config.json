@@ -1,0 +1,284 @@
+{
+  "schema_version": 2,
+  "skill": "refactor-ssr-data-fetching",
+  "description": "Evalúa decisiones de arquitectura de red en React SSR: datos del primer render server-side sin loopback, requests posteriores por BFF same-origin, mutations con validación/authz/ownership, excepción browser→upstream documentada y reconocimiento del scope negativo en CSR puro.",
+  "test_cases": [
+    {
+      "id": "initial-data-ssr-without-loopback",
+      "description": "Clasifica los datos como necesarios para el primer render, rechaza useEffect inicial y loopback HTTP, llama al service server-only tras auth/authz y serializa un DTO mínimo.",
+      "input": "En una página React SSR hay que mostrar permisos, configuración y resumen del usuario en el HTML inicial. Hay dos propuestas:\n\nA) Cargarlos en el cliente:\n```jsx\nuseEffect(() => {\n  fetch('/api/page-data').then((response) => response.json()).then(setPageData);\n}, []);\n```\n\nB) Que getServerSideProps haga HTTP contra la propia API:\n```js\nexport async function getServerSideProps({ req }) {\n  const response = await fetch('http://localhost:3000/api/page-data', { headers: req.headers });\n  return { props: await response.json() };\n}\n```\n\nYa existe un `PageDataService` server-only que la route /api/page-data usa internamente y que devuelve el payload completo del upstream (incluye tokens internos y datos personales). No ejecutes nada: diseñá el flujo correcto, el manejo de errores y los tests.",
+      "assertions": [
+        {
+          "type": "contains_any",
+          "values": [
+            "loopback",
+            "localhost",
+            "mismo proceso",
+            "same process",
+            "propia API",
+            "propia route",
+            "own API"
+          ],
+          "description": "Rechaza el loopback HTTP de SSR contra la propia API del mismo proceso"
+        },
+        {
+          "type": "contains_any",
+          "values": [
+            "primer render",
+            "first render",
+            "HTML inicial",
+            "render inicial",
+            "initial render",
+            "flicker",
+            "parpade"
+          ],
+          "description": "Clasifica los datos como necesarios para el primer render y rechaza useEffect inicial"
+        },
+        {
+          "type": "regex",
+          "pattern": "autoriz|authoriz|permis",
+          "description": "Aplica authentication y authorization antes de llamar al service"
+        },
+        {
+          "type": "contains_any",
+          "values": [
+            "DTO",
+            "browser-safe",
+            "mínimo",
+            "minimo",
+            "minimal",
+            "campos necesarios"
+          ],
+          "description": "Serializa solo un DTO browser-safe mínimo en vez del payload upstream completo"
+        },
+        {
+          "type": "contains_any",
+          "values": [
+            "token",
+            "PII",
+            "sensible",
+            "sensitive",
+            "datos personales"
+          ],
+          "description": "Incluye cobertura o controles contra exposición de datos sensibles"
+        }
+      ]
+    },
+    {
+      "id": "split-ssr-bootstrap-and-bff-requests",
+      "description": "Separa el bootstrap SSR (sucursales y catálogos de filtros) de los requests posteriores a la interacción, que van por BFF relativo same-origin con hosts y headers server-only.",
+      "input": "Una página React SSR de gestión de operadores de depósito necesita, al abrirse, la lista de sucursales del usuario y las opciones de los filtros. La lista de operadores, los líderes de cada equipo y la paginación se piden recién después de que el usuario elige una sucursal o aplica una búsqueda. Hoy el cliente arma requests a `https://internal-api.example.com/operators` agregando un header `x-scope` y el token del usuario. No ejecutes nada: definí qué corre en SSR y qué corre desde el browser, incluyendo URLs, capas, DTOs y manejo de cancelación.",
+      "assertions": [
+        {
+          "type": "contains_any",
+          "values": [
+            "primer render",
+            "first render",
+            "HTML inicial",
+            "carga inicial",
+            "render inicial",
+            "initial render",
+            "initial load",
+            "bootstrap"
+          ],
+          "description": "Obtiene sucursales y catálogos iniciales server-side para el primer render"
+        },
+        {
+          "type": "contains_any",
+          "values": [
+            "/api",
+            "same-origin",
+            "mismo origen",
+            "relativa",
+            "relative"
+          ],
+          "description": "Dirige búsqueda, líderes y paginación a un BFF relativo same-origin"
+        },
+        {
+          "type": "regex",
+          "pattern": "(host|scope|header|token|credencial|credential)[^.]*(server|servidor)|(server|servidor)[^.]*(host|scope|header|token)",
+          "description": "Mantiene hosts, scopes, headers y tokens upstream exclusivamente server-side"
+        },
+        {
+          "type": "contains_any",
+          "values": [
+            "DTO",
+            "browser-safe",
+            "mínimo",
+            "minimo",
+            "minimal"
+          ],
+          "description": "Mapea respuestas upstream a DTOs browser-safe"
+        },
+        {
+          "type": "contains_any",
+          "values": [
+            "AbortController",
+            "abort",
+            "cancel"
+          ],
+          "description": "Contempla la cancelación de requests async (guía AbortController)"
+        }
+      ]
+    },
+    {
+      "id": "mutation-through-bff",
+      "description": "Rechaza la mutation directa browser→upstream y diseña una route BFF con schema, authz, ownership, credenciales server-side, error seguro y logs sanitizados.",
+      "input": "Desde un modal React (app con SSR y BFF propio) se editan el área y los procesos asignados a un operador. Para ahorrar un salto, alguien propone que el browser llame directamente al upstream:\n\n```js\nawait fetch(`https://internal-api.example.com/facilities/${facilityId}/operators/${operatorId}`, {\n  method: 'PUT',\n  headers: { Authorization: `Bearer ${userToken}` },\n  body: JSON.stringify({ area, processes }),\n});\n```\n\n`facilityId` y `operatorId` salen del estado del componente. No ejecutes nada: revisá la propuesta y diseñá la route, las validaciones, la autorización, los logs y la respuesta.",
+      "assertions": [
+        {
+          "type": "contains_any",
+          "values": [
+            "rechaz",
+            "reject",
+            "no es aceptable",
+            "not acceptable",
+            "no recomend",
+            "desaconsej",
+            "no conviene",
+            "no debe",
+            "should not"
+          ],
+          "description": "Rechaza la mutation directa browser→upstream"
+        },
+        {
+          "type": "contains_any",
+          "values": [
+            "BFF",
+            "middle-end",
+            "middleend",
+            "same-origin",
+            "/api"
+          ],
+          "description": "Usa una route BFF same-origin"
+        },
+        {
+          "type": "regex",
+          "pattern": "schema|esquema|zod|joi|yup|valid",
+          "description": "Valida params y body antes de acceder al upstream"
+        },
+        {
+          "type": "contains_any",
+          "values": [
+            "ownership",
+            "pertenenc",
+            "pertenece",
+            "tenant",
+            "propiedad"
+          ],
+          "description": "Revalida permiso y ownership de la sucursal y el operador server-side"
+        },
+        {
+          "type": "contains_any",
+          "values": [
+            "sanitiz",
+            "redact",
+            "PII",
+            "sin token",
+            "no loggear",
+            "no loguear",
+            "no logear"
+          ],
+          "description": "Devuelve error seguro y mantiene logs sanitizados"
+        }
+      ]
+    },
+    {
+      "id": "direct-upstream-documented-exception",
+      "description": "Acepta browser→upstream solo como excepción por falta real de egress server-side, verificando condiciones y exigiendo registro con owner, revisit trigger y vuelta a BFF si algo cambia.",
+      "input": "Un widget React de una app SSR necesita leer un catálogo estático, público y anónimo desde un CDN externo. El runtime SSR no tiene egress hacia ese CDN; el browser sí llega. El endpoint no usa credenciales ni datos de usuario, tiene CORS habilitado explícitamente por su owner y un BFF no agregaría transformación ni política. No ejecutes nada: decidí si el acceso browser→upstream es aceptable, bajo qué condiciones, y qué hay que documentar.",
+      "assertions": [
+        {
+          "type": "contains_any",
+          "values": [
+            "excepción",
+            "excepcion",
+            "exception"
+          ],
+          "description": "Trata el acceso directo como excepción, no como default"
+        },
+        {
+          "type": "contains_any",
+          "values": [
+            "egress",
+            "salida de red",
+            "conectividad"
+          ],
+          "description": "Identifica la falta de egress server-side como restricción concreta"
+        },
+        {
+          "type": "contains_any",
+          "values": [
+            "owner",
+            "dueño",
+            "responsable"
+          ],
+          "description": "Exige registrar el owner del endpoint en el registro de excepción"
+        },
+        {
+          "type": "contains_any",
+          "values": [
+            "revisit",
+            "revis",
+            "reconsider",
+            "reevalu",
+            "re-evalu"
+          ],
+          "description": "Exige un revisit trigger o fecha para reconsiderar la decisión"
+        },
+        {
+          "type": "contains_any",
+          "values": [
+            "BFF"
+          ],
+          "description": "Indica volver a BFF si cualquier condición deja de cumplirse"
+        }
+      ]
+    },
+    {
+      "id": "pure-csr-out-of-scope",
+      "description": "Reconoce que una app Vite 100% CSR queda fuera del scope SSR/BFF, delega en react-data-fetching-best-practices y no inventa infraestructura.",
+      "input": "Tengo una aplicación React con Vite completamente CSR: no hay SSR, ni server routes, ni BFF. Consume una API pública de demostración y el pedido es solo mejorar los estados de loading y error y evitar requests duplicados. No ejecutes nada: indicá qué guía corresponde y cómo encararlo sin inventar infraestructura.",
+      "assertions": [
+        {
+          "type": "contains",
+          "value": "react-data-fetching-best-practices",
+          "description": "Delega loading, error y deduplicación a react-data-fetching-best-practices"
+        },
+        {
+          "type": "contains_any",
+          "values": [
+            "fuera de",
+            "out of scope",
+            "no aplica",
+            "no corresponde",
+            "no es necesario",
+            "does not apply",
+            "doesn't apply"
+          ],
+          "description": "Reconoce que la decisión SSR/BFF está fuera de scope"
+        },
+        {
+          "type": "contains_any",
+          "values": [
+            "dedup",
+            "duplicad",
+            "duplicate"
+          ],
+          "description": "Mantiene el foco en deduplicación de requests en CSR"
+        },
+        {
+          "type": "not_contains_any",
+          "values": [
+            "export async function getServerSideProps",
+            "export async function loader",
+            "express()",
+            "router.get(",
+            "app.get('/api"
+          ],
+          "description": "No inventa SSR, loaders ni un BFF/servidor propio"
+        }
+      ]
+    }
+  ]
+}

@@ -1,0 +1,199 @@
+{
+  "schema_version": 2,
+  "skill": "typed-errors-refactor",
+  "description": "Evalúa refactors de errores tipados: sanitización de errores upstream preservando status públicos, migración de throws genéricos sin imponer clases, cancelación y carreras en React, SSR frente a Error Boundary, taxonomía con retry independiente de HTTP y normalizer seguro para valores unknown.",
+  "test_cases": [
+    {
+      "id": "upstream-leak-sanitize-preserve-status",
+      "description": "Separa dominio, mapping HTTP y DTO, conserva cause solo internamente y sanitiza logs y respuesta sin cambiar status públicos válidos.",
+      "input": "En un servicio TypeScript, una dependencia externa rechaza con response.data, headers, stack y un token. El handler hace:\n\n```ts\ncatch (error) {\n  logger.error(error);\n  res.status(error.response.status).json(error.response.data);\n}\n```\n\nAnalizá y planteá un refactor de errores tipados sin cambiar los códigos/status públicos válidos. No ejecutes nada ni edites archivos: describí el inventario, el contrato, el refactor y los tests.",
+      "assertions": [
+        {
+          "type": "regex",
+          "pattern": "(preserv|conserv|mantener|mantiene|sin cambiar|keep).{0,60}(status|c(o|ó)digo|code)",
+          "description": "Preserva los códigos y status públicos válidos"
+        },
+        {
+          "type": "regex",
+          "pattern": "cause",
+          "description": "Conserva cause para diagnóstico interno"
+        },
+        {
+          "type": "regex",
+          "pattern": "(redact|allowlist|lista blanca|sanitiz)",
+          "description": "No expone response, stack, headers, token ni PII"
+        },
+        {
+          "type": "regex",
+          "pattern": "((mapping|mapeo|mapear|mapper).{0,40}(HTTP|transporte|status|transport)|(HTTP|transport).{0,30}(mapping|mapper))",
+          "description": "Separa dominio, mapping HTTP y DTO público"
+        },
+        {
+          "type": "regex",
+          "pattern": "(negativ|\\.not\\.|no (exponga|contenga|incluya|expone|contiene|incluye|filtre|filtra))",
+          "description": "Agrega tests observables y negativos de sanitización"
+        }
+      ]
+    },
+    {
+      "id": "generic-throws-incremental-migration",
+      "description": "Inventaría throws genéricos y discriminación por mensaje, define códigos estables con guards o normalizer sin imponer clases y migra con un bridge legacy.",
+      "input": "Un repositorio JS/TS tiene código como:\n\n```ts\nthrow new Error('user not found');\nthrow 'invalid token';\n// consumer\nif (error.message.includes('timeout')) retry();\n```\n\nQueremos custom errors pero no sabemos si conviene crear clases. Diseñá una migración segura y decidí qué patrón encaja con el repositorio. No ejecutes nada ni edites archivos: describí el inventario, el patrón elegido, la migración y los tests.",
+      "assertions": [
+        {
+          "type": "regex",
+          "pattern": "(message\\.includes|includes\\(|discrimin|heur(i|í)stica)",
+          "description": "Detecta la discriminación por message como contrato frágil"
+        },
+        {
+          "type": "regex",
+          "pattern": "(c(o|ó)digos? estables?|stable codes?|code:)",
+          "description": "Define códigos estables"
+        },
+        {
+          "type": "regex",
+          "pattern": "(guard|factory|factor(i|í)a|normaliz|discriminated union|uni(o|ó)n discriminada)",
+          "description": "Propone guards, factories, unions o normalizer"
+        },
+        {
+          "type": "regex",
+          "pattern": "((clase|class).{0,80}(si aporta|cuando aporta|solo si|s(o|ó)lo si|only if|only when|no (es|son) necesari|innecesari|opcional)|no (imponer|crear|hace falta|necesit).{0,60}(clase|class|jerarqu)|(innecesari|unnecessary).{0,40}(clase|class|jerarqu))",
+          "description": "No impone clases ni jerarquía si no son necesarias"
+        },
+        {
+          "type": "regex",
+          "pattern": "(bridge|puente|legacy|incremental|gradual)",
+          "description": "Propone migración incremental con bridge legacy y retiro verificable"
+        }
+      ]
+    },
+    {
+      "id": "react-search-abort-and-stale-race",
+      "description": "Trata el abort como camino no-error, propaga signal con cleanup, protege contra respuestas stale y cubre éxito, error, abort y carrera en tests.",
+      "input": "Una búsqueda React hace:\n\n```tsx\nuseEffect(() => {\n  const controller = new AbortController();\n  fetch(`/api/search?q=${term}`, { signal: controller.signal })\n    .then((response) => response.json())\n    .then(setResults)\n    .catch(() => toast.error('Error al buscar'));\n  return () => controller.abort();\n}, [term]);\n```\n\nEl catch muestra un toast para cualquier error, incluido el abort, y hay una carrera donde una respuesta vieja pisa el estado nuevo. Revisá el manejo de errores y proponé implementación y tests. No ejecutes nada ni edites archivos: describí los cambios y los tests.",
+      "assertions": [
+        {
+          "type": "regex",
+          "pattern": "(AbortError|abort|cancel)",
+          "description": "Identifica la cancelación como caso distinto"
+        },
+        {
+          "type": "regex",
+          "pattern": "(silenci|ignor|no mostrar|sin mostrar|no muestr|no dispar|sin toast|no.{0,30}toast|early return|return temprano)",
+          "description": "No muestra feedback de error al usuario por abort"
+        },
+        {
+          "type": "regex",
+          "pattern": "(stale|obsolet|vieja|antigua|out.of.order|carrera|race|requestId|latest)",
+          "description": "Evita que una respuesta stale actualice el estado"
+        },
+        {
+          "type": "regex",
+          "pattern": "(signal|cleanup|clean.up|limpieza)",
+          "description": "Propaga signal y limpia en el cleanup del efecto"
+        },
+        {
+          "type": "regex",
+          "pattern": "(test|prueba|it\\(|describe).{0,100}(abort|carrera|race|stale|cancel)",
+          "description": "Incluye tests de abort y carrera además de éxito y error"
+        }
+      ]
+    },
+    {
+      "id": "ssr-loader-instead-of-global-error-boundary",
+      "description": "Rechaza el Error Boundary global para fallos async: maneja el loader server-side con props controladas y DTO seguro, y reserva el boundary para errores de render.",
+      "input": "Un loader SSR rechaza una Promise y el equipo propone envolver toda la pantalla en un React Error Boundary para manejar todos los fallos. Diseñá el flujo correcto para loader, API, HTML inicial y UI. No ejecutes nada ni edites archivos: describí el flujo y los tests.",
+      "assertions": [
+        {
+          "type": "regex",
+          "pattern": "(errores? de render|render errors?|fallos? de render|durante el render|during render|rendering|renderizado)",
+          "description": "Limita el Error Boundary a fallos de render"
+        },
+        {
+          "type": "regex",
+          "pattern": "((no (captura|atrapa|maneja|cubre|sirve)|does ?n.t (catch|handle)|not caught|won.t catch).{0,80}(async|asincr|promesa|promise|loader|SSR|server|evento)|(async|asincr|promesa|promise|loader|SSR).{0,80}(no (los |las )?(captura|atrapa|maneja|cubre)|not caught|does ?n.t catch))",
+          "description": "Distingue Error Boundary de errores async, API y SSR"
+        },
+        {
+          "type": "regex",
+          "pattern": "((props?|DTO).{0,60}(segur|safe|controlad|sanitiz|serializ)|serializ)",
+          "description": "Captura el fallo en el loader y devuelve props o DTO controlados"
+        },
+        {
+          "type": "regex",
+          "pattern": "(sin|no|without|nunca|never|evitar|excluir|exclu|omit).{0,50}(stack|cause)",
+          "description": "Evita stack, cause y error raw en el HTML inicial"
+        },
+        {
+          "type": "regex",
+          "pattern": "(test|prueba)s?.{0,80}(loader|serializ|fallback)",
+          "description": "Incluye tests de loader, serializer y render fallback"
+        }
+      ]
+    },
+    {
+      "id": "error-taxonomy-retry-independent-of-http",
+      "description": "Define una taxonomía semántica con códigos estables independientes de HTTP, retryability separada y metadata allowlisted.",
+      "input": "Un cliente produce timeout, respuesta inválida, 401 y 409, y todos los consumers los convierten en Error genérico. Diseñá una taxonomía y mapping que permita decidir retry, autorización, conflicto y fallback sin acoplar el dominio a números HTTP. No ejecutes nada ni edites archivos: describí la taxonomía, el mapping y los tests.",
+      "assertions": [
+        {
+          "type": "regex",
+          "pattern": "(upstream.?invalid|invalid.?response|respuesta inv(a|á)lida|invalid.?upstream)",
+          "description": "Distingue la respuesta upstream inválida"
+        },
+        {
+          "type": "regex",
+          "pattern": "conflict",
+          "description": "Distingue el conflicto como semántica propia"
+        },
+        {
+          "type": "regex",
+          "pattern": "(independ|desacopl|decoupl|sin acoplar|no acopl|separ).{0,60}(HTTP|status|transport|n(u|ú)mero)",
+          "description": "Define códigos estables independientes del HTTP status"
+        },
+        {
+          "type": "regex",
+          "pattern": "(retryab|reintentab|isRetryable|retry)",
+          "description": "Modela la retryability como decisión separada del transporte"
+        },
+        {
+          "type": "regex",
+          "pattern": "(allowlist|lista blanca|whitelist|metadata permitid)",
+          "description": "Define metadata allowlisted por código"
+        }
+      ]
+    },
+    {
+      "id": "unknown-thrown-values-safe-normalizer",
+      "description": "Normaliza valores unknown sin asumir message, conserva cause solo internamente, redacta PII y credenciales y produce un fallback estable con tests negativos.",
+      "input": "Una librería puede lanzar null, un string o un objeto con PII; AggregateError incluye una causa con credenciales y stack. Proponé un normalizer robusto y una salida segura. No devuelvas el valor raw al cliente. No ejecutes nada ni edites archivos: describí el diseño y los tests.",
+      "assertions": [
+        {
+          "type": "regex",
+          "pattern": "(unknown|desconocid)",
+          "description": "Acepta el valor lanzado como unknown"
+        },
+        {
+          "type": "regex",
+          "pattern": "(instanceof|typeof)",
+          "description": "Hace narrowing sin asumir que existe message"
+        },
+        {
+          "type": "regex",
+          "pattern": "(redact|allowlist|lista blanca|sanitiz)",
+          "description": "Elimina PII, credenciales, stack y campos no allowlisted"
+        },
+        {
+          "type": "regex",
+          "pattern": "(fallback|c(o|ó)digo estable|stable code|UNKNOWN_ERROR|INTERNAL_ERROR|mensaje seguro|safe message)",
+          "description": "Produce un fallback estable para valores no reconocibles"
+        },
+        {
+          "type": "regex",
+          "pattern": "(negativ|\\.not\\.|no (exponga|contenga|incluya|expone|contiene|incluye|filtre|filtra))",
+          "description": "Incluye tests negativos de serialización segura"
+        }
+      ]
+    }
+  ]
+}

@@ -1,0 +1,167 @@
+{
+  "schema_version": 2,
+  "skill": "async-operation-error-handling",
+  "description": "Evalúa el manejo de errores en operaciones asíncronas distribuidas: lotes parciales con trabajo indeterminado, polling de jobs con estados terminales y cancelación, sanitización e i18n en un BFF, workers concurrentes con retry selectivo y generalización del patrón a otro flujo.",
+  "test_cases": [
+    {
+      "id": "partial-batches-422-timeout-text",
+      "description": "Clasifica por status estructurado antes que por texto, preserva lotes aceptados y trabajo indeterminado, y reanuda sin repetir mutaciones confirmadas.",
+      "input": "Un servicio TypeScript divide una mutación de 80 cuentas en lotes de 20. Dos lotes fueron aceptados y el tercero devuelve HTTP 422 con un mensaje que contiene 'timeout'; el cuarto no responde. Diseñá el contrato de errores y el flujo de recuperación para API, client y UI sin repetir lotes confirmados. No ejecutes nada ni edites archivos: describí el diseño, los estados y los tests.",
+      "assertions": [
+        {
+          "type": "regex",
+          "pattern": "(priorid|prioriz|preced|antes que el (mensaje|texto)|sobre el (mensaje|texto)|over the message|before the message)",
+          "description": "Prioriza el status o código estructurado sobre la heurística del mensaje"
+        },
+        {
+          "type": "regex",
+          "pattern": "(accepted|aceptad|confirmad)",
+          "description": "Registra los lotes aceptados como progreso confirmado"
+        },
+        {
+          "type": "regex",
+          "pattern": "(indetermin|unresolved|sin resolver|desconocid|unknown|ambig)",
+          "description": "Trata el lote sin respuesta como estado indeterminado, no como rechazo"
+        },
+        {
+          "type": "regex",
+          "pattern": "(idempot|reconcili|sin repetir|no repetir|no reenv|no volver a enviar|without repeating)",
+          "description": "Evita repetir mutaciones confirmadas mediante idempotencia o reconciliación"
+        },
+        {
+          "type": "regex",
+          "pattern": "(sanitiz|allowlist|lista blanca|redact)",
+          "description": "Proyecta un DTO público sanitizado o allowlisted"
+        }
+      ]
+    },
+    {
+      "id": "export-jobs-polling-terminal-abort",
+      "description": "Modela estados terminales con fallas por item, reanudación de jobs unresolved, payload inválido controlado y abort sin feedback de error.",
+      "input": "Un frontend React inicia tres jobs de exportación y consulta su estado cada segundo. Uno termina con items fallidos, otro sigue procesando y el tercero devuelve un payload inválido. Al cambiar de pantalla se aborta el polling. Revisá el diseño y proponé estados, errores tipados, reanudación y feedback. No ejecutes nada ni edites archivos: describí el diseño y los tests.",
+      "assertions": [
+        {
+          "type": "regex",
+          "pattern": "(terminal|estado final|final state)",
+          "description": "Define estados terminales explícitos que cortan el polling"
+        },
+        {
+          "type": "regex",
+          "pattern": "(reanud|resume|unresolved|sin resolver)",
+          "description": "Preserva los jobs unresolved y permite reanudarlos"
+        },
+        {
+          "type": "regex",
+          "pattern": "(payload inv(a|á)lido|invalid payload|respuesta inv(a|á)lida|invalid response|upstream.?invalid|malformad|malformed)",
+          "description": "Trata el payload inválido como error controlado"
+        },
+        {
+          "type": "regex",
+          "pattern": "(silenci|ignor|no mostrar|sin mostrar|no muestr|sin feedback|sin toast|no.{0,30}toast|not.{0,20}(show|display))",
+          "description": "No muestra error visible cuando el polling se aborta"
+        },
+        {
+          "type": "regex",
+          "pattern": "(duplic|idempot)",
+          "description": "Evita crear jobs duplicados al reanudar"
+        }
+      ]
+    },
+    {
+      "id": "bff-provider-errors-sanitize-i18n",
+      "description": "Normaliza errores del proveedor en el BFF con DTO y logs allowlisted, códigos estables, mapping HTTP separado y copy localizado en la UI.",
+      "input": "Una API BFF envuelve errores de un proveedor externo. El código actual es:\n\n```ts\ncatch (error) {\n  logger.error('provider failed', { request: error.config, response: error.response });\n  res.status(error.response?.status ?? 500).json(error.response?.data);\n}\n```\n\ny la UI decide el mensaje con `error.message.includes('quota')`. Aplicá un diseño seguro que mantenga compatibilidad pública donde corresponda y soporte traducciones. No ejecutes nada ni edites archivos: describí el diseño, la migración y los tests.",
+      "assertions": [
+        {
+          "type": "regex",
+          "pattern": "(allowlist|whitelist|lista blanca|sanitiz|redact)",
+          "description": "Elimina la exposición de response, headers, stack y secretos con allowlist o sanitización"
+        },
+        {
+          "type": "regex",
+          "pattern": "(c(o|ó)digos? estables?|stable (error )?codes?|errorCode|error code)",
+          "description": "Define códigos estables independientes del copy"
+        },
+        {
+          "type": "regex",
+          "pattern": "((mapping|mapeo|mapear|mapper).{0,40}(HTTP|status|transporte|transport)|(HTTP|status).{0,40}(mapping|mapeo|mapper))",
+          "description": "Separa el mapping HTTP de la semántica de dominio"
+        },
+        {
+          "type": "regex",
+          "pattern": "(i18n|traducc|translat|locali|msgid|cat(a|á)logo)",
+          "description": "Migra la UI a un mapper de copy localizado"
+        },
+        {
+          "type": "regex",
+          "pattern": "(negativ|\\.not\\.|no (exponga|contenga|incluya|expone|contiene|incluye|filtre|filtra))",
+          "description": "Agrega aserciones negativas de sanitización"
+        }
+      ]
+    },
+    {
+      "id": "worker-concurrent-windows-selective-retry",
+      "description": "Migra el worker a resultados por mensaje, concurrencia limitada y retry solo de fallos transitorios con tests de idempotencia.",
+      "input": "Un worker procesa mensajes en ventanas concurrentes con `await Promise.all(window.map(processMessage))`. Promise.all aborta toda la ventana ante un fallo, y el retry vuelve a publicar todos los mensajes. Diseñá una migración incremental que conserve resultados por mensaje, limite concurrencia y reintente solo fallos seguros. No ejecutes nada ni edites archivos: describí el diseño y los tests.",
+      "assertions": [
+        {
+          "type": "regex",
+          "pattern": "(allSettled|settled|por mensaje|per.?message|por item|per.?item)",
+          "description": "Conserva los éxitos aunque falle otro mensaje de la ventana"
+        },
+        {
+          "type": "regex",
+          "pattern": "(retryable|reintentable|transitori|transient)",
+          "description": "Reintenta solo los elementos elegibles por clasificación"
+        },
+        {
+          "type": "regex",
+          "pattern": "(permanent|no reintentable|non.?retryable|dead.?letter|DLQ)",
+          "description": "Separa fallos permanentes de transitorios"
+        },
+        {
+          "type": "regex",
+          "pattern": "(concurren|p.limit|pool|backpressure|sem(a|á)foro|semaphore)",
+          "description": "Mantiene límites de concurrencia o backpressure"
+        },
+        {
+          "type": "regex",
+          "pattern": "(idempot|dedup)",
+          "description": "Incluye idempotencia y tests observables de no duplicación"
+        }
+      ]
+    },
+    {
+      "id": "reuse-async-assignment-pattern",
+      "description": "Generaliza el patrón de asignación asíncrona a otro flujo sin nombres de dominio, separando preflight, partial y resume, y respetando catálogos generados.",
+      "input": "Una operación de asignación existente tiene preflight failures, runs asíncronos, timeout de polling y feedback en tres idiomas. Los textos viven en catálogos fuente y un script genera los catálogos compilados. Quiero reutilizar el patrón para otro flujo, sin copiar nombres de dominio ni editar catálogos generados manualmente. Indicá qué abstraer y cómo validar. No ejecutes nada ni edites archivos: describí el plan.",
+      "assertions": [
+        {
+          "type": "regex",
+          "pattern": "(gen(e|é)ric|agn(o|ó)stic|reutiliz|reusable|abstra)",
+          "description": "Generaliza el patrón sin depender de un dominio específico"
+        },
+        {
+          "type": "regex",
+          "pattern": "(preflight|pre-flight|validaci(o|ó)n previa)",
+          "description": "Conserva preflight como concepto separado"
+        },
+        {
+          "type": "regex",
+          "pattern": "(reanud|resume)",
+          "description": "Conserva la reanudación como concepto separado de partial"
+        },
+        {
+          "type": "regex",
+          "pattern": "(generad|generated|fuente de verdad|source of truth|cat(a|á)logos? fuente|source catalog)",
+          "description": "Distingue catálogos fuente de archivos generados"
+        },
+        {
+          "type": "regex",
+          "pattern": "(test|prueba)s?.{0,80}(contrato|contract|nuevo flujo|terminal|resume|reanud|cancel|partial|parcial)",
+          "description": "Propone contrato y tests aplicables al nuevo flujo"
+        }
+      ]
+    }
+  ]
+}

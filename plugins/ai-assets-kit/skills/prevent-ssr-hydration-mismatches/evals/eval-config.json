@@ -1,0 +1,235 @@
+{
+  "schema_version": 2,
+  "skill": "prevent-ssr-hydration-mismatches",
+  "description": "Evalúa diagnóstico y prevención de hydration mismatches en React SSR: fuente única de verdad serializada, allowlist de query, valores no deterministas (fecha, random, locale, timezone), APIs browser-only y librerías client-only, nesting HTML inválido, rechazo de suppressHydrationWarning y tests con renderToString + hydrateRoot.",
+  "test_cases": [
+    {
+      "id": "query-dual-source-of-truth",
+      "description": "Detecta doble fuente de verdad entre req.query en SSR y window.location.search en cliente, y propone snapshot validado, con allowlist y autoritativo aunque esté vacío.",
+      "input": "Tengo una página React SSR (servidor Express propio) de listado de usuarios. No ejecutes nada: describí diagnóstico, fix y tests.\n\nController del servidor:\n```js\napp.get('/users', async (req, res) => {\n  const results = await usersService.search({ search: req.query.search });\n  res.render(View, { results, user: req.user, headers: req.headers });\n});\n```\n\nView (se renderiza en SSR y luego se hidrata con hydrateRoot):\n```jsx\nclass View extends React.Component {\n  constructor(props) {\n    super(props);\n    const params = new URLSearchParams(typeof window !== 'undefined' ? window.location.search : '');\n    this.state = { search: params.get('search') || '' };\n  }\n  render() {\n    return (\n      <form>\n        <input value={this.state.search} onChange={...} />\n        {this.state.search && <button type=\"button\">Limpiar</button>}\n        <Results items={this.props.results} />\n      </form>\n    );\n  }\n}\n```\n\nCon /users?search=foo el servidor renderiza el input vacío y el cliente muestra 'foo' más el botón de limpiar; la consola muestra 'Hydration failed'. Corregí el flujo y proponé tests de regresión sin ocultar el warning.",
+      "assertions": [
+        {
+          "type": "contains_any",
+          "values": [
+            "fuente de verdad",
+            "fuentes de verdad",
+            "source of truth",
+            "doble fuente",
+            "dos fuentes",
+            "misma fuente",
+            "fuente única",
+            "fuente unica"
+          ],
+          "description": "Identifica la doble fuente de verdad entre req.query y window.location.search"
+        },
+        {
+          "type": "contains_any",
+          "values": [
+            "allowlist",
+            "whitelist",
+            "lista blanca",
+            "lista permitida",
+            "claves permitidas",
+            "keys permitidas",
+            "pickAllowed",
+            "allowed keys"
+          ],
+          "description": "Copia la query validada mediante una allowlist explícita de claves"
+        },
+        {
+          "type": "regex",
+          "pattern": "vac(i|í)|empty|\\{\\}",
+          "description": "Trata el estado serializado vacío como autoritativo, sin volver a leer location.search"
+        },
+        {
+          "type": "contains_any",
+          "values": [
+            "cookie",
+            "token",
+            "sensible",
+            "sensitive",
+            "authorization",
+            "req.headers"
+          ],
+          "description": "Evita serializar headers, cookies, tokens u otros datos sensibles del request"
+        },
+        {
+          "type": "regex",
+          "pattern": "hydrateRoot|onRecoverableError",
+          "description": "Propone test de regresión con renderToString + hydrateRoot verificando cero recoverable errors"
+        }
+      ]
+    },
+    {
+      "id": "time-random-locale-timezone",
+      "description": "Explica la divergencia por new Date(), Math.random() y formateo con locale/timezone implícitos, y propone valores estables más tests con locale y timezone controlados.",
+      "input": "Tengo este componente React que se renderiza con SSR y luego se hidrata. No ejecutes nada: describí diagnóstico, fix y cobertura automatizada.\n\n```jsx\nexport function UpdatedCard({ updatedAt }) {\n  const id = `card-${Math.random().toString(36).slice(2)}`;\n  const minutes = Math.round((new Date() - new Date(updatedAt)) / 60000);\n  return (\n    <article aria-labelledby={id}>\n      <h3 id={id}>Actualizado hace {minutes} minutos</h3>\n      <time>{new Date(updatedAt).toLocaleString()}</time>\n    </article>\n  );\n}\n```\n\nEl error de hidratación aparece solo para usuarios cuyo timezone es distinto al del servidor. Proponé el fix, cómo mantener la actualización en vivo del 'hace N minutos' y los tests.",
+      "assertions": [
+        {
+          "type": "regex",
+          "pattern": "timezone|time zone|timeZone|zona horaria|huso horario",
+          "description": "Explica la divergencia por timezone entre servidor y cliente"
+        },
+        {
+          "type": "contains_any",
+          "values": [
+            "useId",
+            "id estable",
+            "id determin",
+            "stable id",
+            "id del dato",
+            "id de dominio",
+            "domain id",
+            "id del registro"
+          ],
+          "description": "Reemplaza Math.random por un ID estable (useId o ID de dominio)"
+        },
+        {
+          "type": "contains_any",
+          "values": [
+            "serializ",
+            "snapshot",
+            "renderedAt",
+            "now del servidor",
+            "timestamp del servidor",
+            "server timestamp"
+          ],
+          "description": "Calcula el instante una sola vez y lo comparte entre SSR y primer render cliente"
+        },
+        {
+          "type": "contains_any",
+          "values": [
+            "useEffect",
+            "después de la hidrat",
+            "despues de la hidrat",
+            "después de hidrat",
+            "tras la hidrat",
+            "post-hidrat",
+            "after hydration",
+            "post-hydration"
+          ],
+          "description": "Mantiene posibles las actualizaciones en vivo después de la hidratación"
+        },
+        {
+          "type": "regex",
+          "pattern": "TZ=|process\\.env\\.TZ|Intl\\.DateTimeFormat|timeZone:|useFakeTimers|setSystemTime|fecha fija|reloj fijo|fixed (date|clock|time)",
+          "description": "Los tests controlan timezone, locale o reloj para que el render sea determinista"
+        }
+      ]
+    },
+    {
+      "id": "browser-apis-and-client-only-library",
+      "description": "Evita lecturas de matchMedia/localStorage en el primer render, usa contexto de dispositivo o fallback estable, y aísla la librería client-only sin pasar toda la página a CSR.",
+      "input": "Tengo un menú React con SSR. No ejecutes nada: describí diagnóstico, fix y tests.\n\n```jsx\nimport Chart from 'some-chart-lib'; // toca window al importarse\n\nexport function Menu() {\n  const [isMobile] = useState(() => window.matchMedia('(max-width: 768px)').matches);\n  const [collapsed] = useState(() => localStorage.getItem('menu-collapsed') === 'true');\n  return (\n    <nav>\n      {isMobile ? <MobileMenu collapsed={collapsed} /> : <DesktopMenu collapsed={collapsed} />}\n      <Chart data={usage} />\n    </nav>\n  );\n}\n```\n\nEl SSR renderiza el menú desktop; en el celular el cliente hidrata el menú mobile y la página explota. Arreglalo sin convertir toda la página a CSR.",
+      "assertions": [
+        {
+          "type": "contains_any",
+          "values": [
+            "useEffect",
+            "después de la hidrat",
+            "despues de la hidrat",
+            "después de hidrat",
+            "tras la hidrat",
+            "post-hidrat",
+            "after hydration",
+            "post-hydration"
+          ],
+          "description": "Difiere las lecturas de matchMedia y localStorage hasta después de la hidratación"
+        },
+        {
+          "type": "contains_any",
+          "values": [
+            "user-agent",
+            "user agent",
+            "userAgent",
+            "client hints",
+            "Sec-CH-UA",
+            "contexto de dispositivo",
+            "device context",
+            "fallback",
+            "placeholder"
+          ],
+          "description": "Usa contexto de dispositivo del servidor o un fallback estable compartido"
+        },
+        {
+          "type": "regex",
+          "pattern": "import\\(|dynamic|lazy|client-only|ClientOnly|solo (en )?(el )?cliente|sólo (en )?(el )?cliente",
+          "description": "Aísla la librería client-only en el boundary más chico mediante import diferido"
+        },
+        {
+          "type": "contains_any",
+          "values": [
+            "dimensiones",
+            "dimensions",
+            "layout shift",
+            "CLS",
+            "altura",
+            "height",
+            "reservar espacio",
+            "reserve space"
+          ],
+          "description": "Preserva dimensiones del placeholder para evitar layout shift"
+        }
+      ]
+    },
+    {
+      "id": "invalid-nesting-reject-suppress",
+      "description": "Reconoce la reparación del parser por nesting HTML inválido, corrige el markup, rechaza suppressHydrationWarning global y exige build real más validación en consola del browser.",
+      "input": "React reporta un hydration mismatch en este componente SSR. No ejecutes nada: revisá la propuesta, corregí el markup y definí la verificación.\n\n```jsx\nexport function Page({ product }) {\n  return (\n    <main>\n      <p className=\"summary\">\n        <div className=\"price\">{product.price}</div>\n        <button onClick={openDetails}>\n          Ver detalle\n          <button onClick={addToFavorites}>Favorito</button>\n        </button>\n      </p>\n    </main>\n  );\n}\n```\n\nUn compañero propone agregar suppressHydrationWarning en el elemento raíz de Page para que desaparezca el warning. Revisá esa propuesta, corregí el markup y definí cómo verificarlo en runtime.",
+      "assertions": [
+        {
+          "type": "regex",
+          "pattern": "parser|parsea|repar|repair|anidamiento|nesting|anidad",
+          "description": "Identifica el nesting inválido reparado por el parser del browser como causa"
+        },
+        {
+          "type": "contains_any",
+          "values": [
+            "span",
+            "section",
+            "<div"
+          ],
+          "description": "Corrige el markup semántico (p sin bloques, sin button anidado)"
+        },
+        {
+          "type": "contains_any",
+          "values": [
+            "rechaz",
+            "reject",
+            "no usar",
+            "no uses",
+            "no aplicar",
+            "no corrige",
+            "no resuelve",
+            "oculta",
+            "esconde",
+            "enmascara",
+            "hides",
+            "masks"
+          ],
+          "description": "Rechaza suppressHydrationWarning amplio como forma de ocultar el problema"
+        },
+        {
+          "type": "contains_any",
+          "values": [
+            "build",
+            "compilación",
+            "compilacion"
+          ],
+          "description": "Exige correr el build real del proyecto"
+        },
+        {
+          "type": "contains_any",
+          "values": [
+            "consola",
+            "console",
+            "DevTools",
+            "hard reload",
+            "recarga"
+          ],
+          "description": "Exige verificar la consola del browser tras recargar la página"
+        }
+      ]
+    }
+  ]
+}
