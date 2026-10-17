@@ -357,3 +357,34 @@ add_other_plugin_on_base() {
   [[ "$output" == *"Select a plugin by number"* ]]
   [[ "$output" != *"Detected changed plugin"* ]]
 }
+
+@test "auto-selects the only plugin when no plugin changed" {
+  run bash -c "printf '1\n' | node scripts/create-version.js"
+
+  [ "$status" -eq 0 ]
+  [[ "$output" == *"Only plugin available: ai-assets-kit"* ]]
+  [[ "$output" != *"Select a plugin by number"* ]]
+  [ "$(node -p "require('./plugins/ai-assets-kit/.claude-plugin/plugin.json').version")" = "1.12.1" ]
+}
+
+@test "auto-detects plugin committed on the default branch after its last version change" {
+  mkdir -p plugins/other-plugin/.claude-plugin plugins/other-plugin/.codex-plugin plugins/ai-assets-kit/docs
+  for provider_directory in .claude-plugin .codex-plugin; do
+    printf '%s\n' '{' '  "name": "other-plugin",' '  "version": "2.0.0"' '}' \
+      > "plugins/other-plugin/$provider_directory/plugin.json"
+  done
+  git add plugins/other-plugin
+  git commit -qm "Add other plugin"
+  printf '%s\n' 'released without bump' > plugins/ai-assets-kit/docs/change.md
+  git add plugins/ai-assets-kit/docs/change.md
+  git commit -qm "Change AI Assets Kit"
+  git push -q origin main
+  git fetch -q origin
+
+  run bash -c "printf '1\n' | node scripts/create-version.js --dry-run"
+
+  [ "$status" -eq 0 ]
+  [[ "$output" == *"Detected changed plugin: ai-assets-kit"* ]]
+  [[ "$output" != *"Select a plugin by number"* ]]
+  [[ "$output" == *"1.12.0 → 1.12.1"* ]]
+}

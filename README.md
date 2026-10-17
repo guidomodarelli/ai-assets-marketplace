@@ -220,7 +220,7 @@ el repositorio no cambia.
 
 ## 🔖 Bumping de versión de un plugin
 
-Usá el script `create-version` para hacer bump a la versión de un plugin. Actualiza el campo `version` en **ambos** manifiestos de proveedor (`.claude-plugin/plugin.json` y `.codex-plugin/plugin.json`) a la vez, manteniéndolos sincronizados.
+Usá el script `create-version` para hacer bump a la versión de un plugin. Actualiza el campo `version` en **ambos** manifiestos de proveedor (`.claude-plugin/plugin.json` y `.codex-plugin/plugin.json`) a la vez, manteniéndolos sincronizados. `npm run cv` es un alias corto con los mismos argumentos (`npm run cv -- --dry-run`).
 
 ```bash
 npm run create-version              # auto-detecta el único plugin cambiado sin bump en la branch; si no, muestra menú
@@ -231,7 +231,7 @@ npm run create-version -- --set 2.0.0  # versión exacta sin prompts
 npm run create-version -- --help     # ayuda (shorthand: -h)
 ```
 
-El script compara branch actual contra primera base remota disponible (`origin/develop`, `origin/master` u `origin/main`) y suma cambios locales para detectar qué plugin cambió. Ignora archivos fuera de `plugins/` para esa decisión. Luego pregunta cómo establecer la nueva versión — un semver bump (`patch` / `minor` / `major`) calculado desde la versión actual, o una versión exacta personalizada — crea un commit que incluye **solo** los dos `plugin.json` actualizados (el resto de cambios staged, unstaged o untracked queda intacto) y hace `push` automático de la rama (con `-u origin HEAD` si todavía no tiene upstream). Nunca hace force-push y omite el push en ramas default (`develop`, `master`, `main`); si el push falla, el commit local se conserva y el script termina con error. Con `--dry-run` (o `-n`) recorre los mismos prompts y muestra qué archivos actualizaría, el commit y el push planeados, sin modificar nada. `--bump <kind>` o `--set <version>` evitan el prompt de versión (no se pueden combinar) y `--help` (`-h`) muestra el uso.
+El script compara branch actual contra primera base remota disponible (`origin/develop`, `origin/master` u `origin/main`) y suma cambios locales y los commits hechos en cada plugin después del último cambio de su versión (así detecta un plugin mergeado a la rama default sin bump) para detectar qué plugin cambió. Si el repo tiene un solo plugin, lo selecciona sin mostrar el menú. Ignora archivos fuera de `plugins/` para esa decisión. Luego pregunta cómo establecer la nueva versión — un semver bump (`patch` / `minor` / `major`) calculado desde la versión actual, o una versión exacta personalizada — crea un commit que incluye **solo** los dos `plugin.json` actualizados (el resto de cambios staged, unstaged o untracked queda intacto) y hace `push` automático de la rama (con `-u origin HEAD` si todavía no tiene upstream). Nunca hace force-push y omite el push en ramas default (`develop`, `master`, `main`); si el push falla, el commit local se conserva y el script termina con error. Con `--dry-run` (o `-n`) recorre los mismos prompts y muestra qué archivos actualizaría, el commit y el push planeados, sin modificar nada. `--bump <kind>` o `--set <version>` evitan el prompt de versión (no se pueden combinar) y `--help` (`-h`) muestra el uso.
 
 > ⚠️ Antes de escribir, valida que ambos manifiestos ya compartan la misma versión y aborta si difieren — nunca vas a hacer bump desde un estado inconsistente.
 

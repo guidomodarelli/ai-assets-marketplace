@@ -37,6 +37,8 @@ const DRY_RUN_BANNER_MESSAGE = '🧪 DRY RUN · nothing will be written, committ
 const DRY_RUN_COMPLETE_MESSAGE = '🧪 DRY RUN complete · run again without --dry-run to apply';
 const SEMVER_PATTERN = /^\d+\.\d+\.\d+$/;
 const VERSION_FIELD_PATTERN = /("version"\s*:\s*")([^"]+)(")/;
+/** Matches manifest diff lines that touch the `version` key (POSIX regex for `git log -G`). */
+const VERSION_KEY_DIFF_PATTERN = '"version"';
 
 /** Bump kinds offered for semantic version increments. */
 const BUMP_KINDS = {
@@ -179,7 +181,7 @@ function readManifest(manifestPath) {
 /**
  * Discovers plugins that expose both Claude and Codex manifests.
  *
- * @returns {Array<{ name: string, claudePath: string, codexPath: string }>} Discovered plugins.
+ * @returns {Array<{ name: string, rootPath: string, claudePath: string, codexPath: string }>} Discovered plugins.
  */
 function discoverPlugins() {
   if (!fs.existsSync(PLUGINS_DIR)) {
@@ -193,6 +195,7 @@ function discoverPlugins() {
       const pluginRoot = path.join(PLUGINS_DIR, entry.name);
       return {
         name: entry.name,
+        rootPath: pluginRoot,
         claudePath: path.join(pluginRoot, CLAUDE_MANIFEST),
         codexPath: path.join(pluginRoot, CODEX_MANIFEST),
       };
@@ -280,17 +283,60 @@ function getChangedPaths() {
 }
 
 /**
- * Detects plugin names changed under `plugins/`, ignoring other paths.
+ * Converts an absolute path into the repository-relative, slash-separated form Git expects.
  *
+ * @param {string} absolutePath Absolute path inside the repository.
+ * @returns {string} Repository-relative path.
+ */
+function toRepositoryPath(absolutePath) {
+  return path.relative(REPOSITORY_ROOT, absolutePath).split(path.sep).join('/');
+}
+
+/**
+ * Finds the last commit that changed the plugin's `version` field.
+ *
+ * @param {{ claudePath: string }} plugin Plugin descriptor.
+ * @returns {string} Commit hash, or empty string when the manifest has no committed version yet.
+ */
+function getLastVersionChangeCommit(plugin) {
+  return runGit([
+    'log', '-1', '--format=%H', `-G${VERSION_KEY_DIFF_PATTERN}`, '--', toRepositoryPath(plugin.claudePath),
+  ]).trim();
+}
+
+/**
+ * Detects plugins with committed changes after their last version change, so plugins
+ * already merged into the default branch without a bump are still detected there.
+ *
+ * @param {Array<{ name: string, rootPath: string, claudePath: string }>} plugins Discovered plugins.
+ * @returns {string[]} Names of plugins with unreleased commits.
+ */
+function detectPluginsChangedSinceLastVersion(plugins) {
+  return plugins
+    .filter((plugin) => {
+      const lastVersionChangeCommit = getLastVersionChangeCommit(plugin);
+      if (!lastVersionChangeCommit) {
+        return false;
+      }
+      return runGit(['diff', '--name-only', lastVersionChangeCommit, 'HEAD', '--', toRepositoryPath(plugin.rootPath)]).trim() !== '';
+    })
+    .map((plugin) => plugin.name);
+}
+
+/**
+ * Detects plugin names changed under `plugins/`, ignoring other paths: changes in the
+ * current branch and working tree, plus commits made after each plugin's last version change.
+ *
+ * @param {Array<{ name: string, claudePath: string }>} plugins Discovered plugins.
  * @returns {string[]} Unique changed plugin names.
  */
-function detectChangedPluginNames() {
-  return [...new Set(
-    getChangedPaths()
-      .map((changedPath) => changedPath.split('/'))
-      .filter(([rootDirectory, pluginName]) => rootDirectory === 'plugins' && pluginName)
-      .map(([, pluginName]) => pluginName)
-  )];
+function detectChangedPluginNames(plugins) {
+  const branchChangedPluginNames = getChangedPaths()
+    .map((changedPath) => changedPath.split('/'))
+    .filter(([rootDirectory, pluginName]) => rootDirectory === 'plugins' && pluginName)
+    .map(([, pluginName]) => pluginName);
+
+  return [...new Set([...branchChangedPluginNames, ...detectPluginsChangedSinceLastVersion(plugins)])];
 }
 
 /**
@@ -320,10 +366,8 @@ function getBranchBaseCommit() {
  * @returns {string} Version at that commit, or empty string when the manifest did not exist there.
  */
 function readBaseManifestVersion(baseCommit, plugin) {
-  const manifestPath = path.relative(REPOSITORY_ROOT, plugin.claudePath).split(path.sep).join('/');
-
   try {
-    const parsed = JSON.parse(runGit(['show', `${baseCommit}:${manifestPath}`]));
+    const parsed = JSON.parse(runGit(['show', `${baseCommit}:${toRepositoryPath(plugin.claudePath)}`]));
     return typeof parsed.version === 'string' ? parsed.version : '';
   } catch (error) {
     // New plugins have no manifest at the base commit, so there is no bump to detect.
@@ -698,6 +742,12 @@ async function resolvePlugin(ask, plugins, requestedName, changedPluginNames, bu
     return match;
   }
 
+  if (plugins.length === 1) {
+    const [onlyPlugin] = plugins;
+    console.log(`\n🔍 Only plugin available: ${paint('cyan', paint('bold', onlyPlugin.name))}`);
+    return onlyPlugin;
+  }
+
   if (pendingPluginNames.length > 1) {
     console.log(`\n🔍 Detected changed plugins: ${paint('cyan', pendingPluginNames.join(', '))}`);
   }
@@ -785,7 +835,7 @@ async function main() {
   }
 
   const plugins = discoverPlugins();
-  const changedPluginNames = detectChangedPluginNames();
+  const changedPluginNames = detectChangedPluginNames(plugins);
 
   if (plugins.length === 0) {
     throw new Error('No plugins with both Claude and Codex manifests were found.');
