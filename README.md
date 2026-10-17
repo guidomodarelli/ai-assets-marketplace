@@ -257,6 +257,11 @@ providers falsos y no llama a Claude ni a Codex reales.
 `bun run test:sibling-worktree` corre la suite del helper de `sibling-worktree` sobre repos git
 temporales.
 
+Cada test tiene un timeout de 30 segundos: `test:shell` usa `BATS_TEST_TIMEOUT=30` y las suites
+bash de `review-fix-loop` y `sibling-worktree` corren cada test bajo `timeout` (`gtimeout` en macOS).
+Un test que se cuelga falla con `timeout` en vez de bloquear la corrida. Para cambiar el límite en las
+suites bash, exportá `TEST_TIMEOUT_SECONDS`.
+
 `bun run test:browser` ejecuta pruebas de registro browser desde el venv local,
 sin descargar dependencias. La prueba de lanzamiento real es opt-in mediante
 `AGENT_READY_SETUP_BROWSER_SMOKE_ROOT` (directorio administrado de herramientas)

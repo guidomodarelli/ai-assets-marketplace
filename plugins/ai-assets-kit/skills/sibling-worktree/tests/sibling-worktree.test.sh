@@ -465,19 +465,56 @@ test_invalid_path_and_symlink_block() {
   teardown_fixture
 }
 
+# Cada test corre en su propio proceso bajo `timeout`, que corta el grupo de procesos
+# completo: un test colgado falla a los TEST_TIMEOUT_SECONDS en vez de bloquear la suite.
+readonly DEFAULT_TEST_TIMEOUT_SECONDS=30
+readonly TIMEOUT_EXIT_STATUS=124
+readonly SINGLE_TEST_FLAG=--run-single-test
+TEST_TIMEOUT_SECONDS=${TEST_TIMEOUT_SECONDS:-$DEFAULT_TEST_TIMEOUT_SECONDS}
+TEST_SCRIPT_PATH="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/$(basename "${BASH_SOURCE[0]}")"
+TIMEOUT_COMMAND=$(command -v timeout || command -v gtimeout || true)
+
+run_isolated_test() {
+  local test_function=$1
+  if [[ -z "$TIMEOUT_COMMAND" ]]; then
+    bash "$TEST_SCRIPT_PATH" "$SINGLE_TEST_FLAG" "$test_function"
+    return
+  fi
+  "$TIMEOUT_COMMAND" --kill-after=5 "$TEST_TIMEOUT_SECONDS" bash "$TEST_SCRIPT_PATH" "$SINGLE_TEST_FLAG" "$test_function"
+}
+
+report_test_result() {
+  local name=$1
+  local status=$2
+  if [[ "$status" -eq 0 ]]; then
+    printf 'ok %d - %s\n' "$tests_run" "$name"
+    return
+  fi
+  failures=$((failures + 1))
+  if [[ "$status" -eq "$TIMEOUT_EXIT_STATUS" ]]; then
+    printf 'not ok %d - %s (timeout: superó %ss)\n' "$tests_run" "$name" "$TEST_TIMEOUT_SECONDS"
+  else
+    printf 'not ok %d - %s\n' "$tests_run" "$name"
+  fi
+}
+
+if [[ "${1:-}" == "$SINGLE_TEST_FLAG" ]]; then
+  TEST_FAILED=false
+  "$2" || true
+  if [[ "$TEST_FAILED" == false ]]; then
+    exit 0
+  fi
+  teardown_fixture
+  exit 1
+fi
+
 run_test() {
   local name=$1
   local test_function=$2
+  local status=0
   tests_run=$((tests_run + 1))
-  TEST_FAILED=false
-  "$test_function" || true
-  if [[ "$TEST_FAILED" == false ]]; then
-    printf 'ok %d - %s\n' "$tests_run" "$name"
-  else
-    failures=$((failures + 1))
-    printf 'not ok %d - %s\n' "$tests_run" "$name"
-    teardown_fixture
-  fi
+  run_isolated_test "$test_function" || status=$?
+  report_test_result "$name" "$status"
 }
 
 trap teardown_fixture EXIT
